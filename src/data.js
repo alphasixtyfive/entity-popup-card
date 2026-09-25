@@ -2,7 +2,7 @@ import { controlFor, isActive as controlIsActive, isKnown as controlIsKnown } fr
 
 const ENTITY = /^[a-z_][a-z0-9_]*\.[a-z0-9_]+$/;
 const PATH = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$/;
-const SOURCES = new Set(["members", "entities", "match", "values"]);
+const SOURCES = new Set(["members", "entities", "match", "values", "records"]);
 const MODES = new Set(["view", "controls"]);
 // Attribute paths come from YAML, so read only ordinary properties on each object.
 const PROTOTYPE_KEYS = new Set(["__proto__", "prototype", "constructor"]);
@@ -57,7 +57,7 @@ function collectSection(states, rootEntity, section) {
     unavailable: [],
     membershipKnown: true,
     sourceAvailable:
-      !["members", "values"].includes(section.source) ||
+      !["members", "values", "records"].includes(section.source) ||
       (!!root && !["unknown", "unavailable"].includes(root.state)),
   };
   const seen = new Set();
@@ -124,6 +124,38 @@ function collectSection(states, rootEntity, section) {
         attributes: {},
         icon: section.value_icons?.[value] || section.icon,
         color: section.value_colors?.[value],
+      });
+    }
+  } else if (section.source === "records") {
+    const records = result.sourceAvailable
+      ? atPath(root?.attributes, section.attribute)
+      : undefined;
+    result.membershipKnown = Array.isArray(records);
+    for (const [index, value] of (Array.isArray(records) ? records : []).entries()) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      const entity =
+        typeof value.entity === "string" && ENTITY.test(value.entity) ? value.entity : undefined;
+      const record = entity ? states?.[entity] : undefined;
+      const name =
+        typeof value.name === "string" && value.name.trim()
+          ? value.name
+          : record?.attributes?.friendly_name || entity || `Item ${index + 1}`;
+      add({
+        key: `record:${index}`,
+        entity,
+        name,
+        state: record?.state ?? "unavailable",
+        icon:
+          value.icon ||
+          section.kind_icons?.[value.kind] ||
+          record?.attributes?.icon ||
+          section.icon,
+        color: value.color || section.severity_colors?.[value.severity],
+        attributes: record?.attributes || {},
+        last_changed: record?.last_changed,
+        value: value.value,
+        kind: value.kind,
+        severity: value.severity,
       });
     }
   }

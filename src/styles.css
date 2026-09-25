@@ -17,6 +17,14 @@
 :host([compact]) .tile > * {
   height: auto;
 }
+:host([badge]) {
+  display: inline-block;
+  height: auto;
+}
+:host([badge]) .tile,
+:host([badge]) .tile > * {
+  height: auto;
+}
 dialog {
   box-sizing: border-box;
   width: min(var(--entity-popup-width, 480px), calc(100vw - 24px));

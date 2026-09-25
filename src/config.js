@@ -7,7 +7,7 @@ const entryEntity = (entry) => (typeof entry === "string" ? entry : entry?.entit
 
 function validateSection(section) {
   if (!section || !SOURCES.has(section.source)) {
-    throw new Error("Choose a popup section source: members, entities, match, or values.");
+    throw new Error("Choose a popup section source: members, entities, match, values, or records.");
   }
   if (!MODES.has(section.mode || "view")) {
     throw new Error("Section mode must be view or controls.");
@@ -22,8 +22,8 @@ function validateSection(section) {
   if (section.source === "members" && !isPath(section.attribute || "entity_id")) {
     throw new Error("Invalid member attribute.");
   }
-  if (section.source === "values" && !isPath(section.attribute)) {
-    throw new Error("A values section needs an attribute.");
+  if (["values", "records"].includes(section.source) && !isPath(section.attribute)) {
+    throw new Error(`A ${section.source} section needs an attribute.`);
   }
   if (
     section.source === "entities" &&

@@ -1,8 +1,19 @@
 import { EntityPopupCard } from "./card.js";
+import { EntityPopupBadge } from "./badge.js";
 import { CONTROL_TYPES } from "./controls.js";
 
 if (!customElements.get("entity-popup-card"))
   customElements.define("entity-popup-card", EntityPopupCard);
+if (!customElements.get("entity-popup-badge"))
+  customElements.define("entity-popup-badge", EntityPopupBadge);
+window.customBadges = window.customBadges || [];
+if (!window.customBadges.some((badge) => badge.type === "entity-popup-badge")) {
+  window.customBadges.push({
+    type: "entity-popup-badge",
+    name: "Entity Popup Badge",
+    description: "A compact status badge that opens a live list of related entities.",
+  });
+}
 window.customCards = window.customCards || [];
 if (!window.customCards.some((card) => card.type === "entity-popup-card")) {
   window.customCards.push({

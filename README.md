@@ -12,8 +12,8 @@ The maintained source is in [`src/`](src/). The root `entity-popup-card.js` is g
 
 These previews use example entities. The popup picks up your Home Assistant theme.
 
-| Light controls | Air & pollen |
-| --- | --- |
+| Light controls                                                           | Air & pollen                                                            |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | ![Light popup with two quick switches](docs/screenshots/light-popup.png) | ![Air and pollen readings in the popup](docs/screenshots/air-popup.png) |
 
 On a phone, the same popup opens as a bottom sheet:
@@ -171,6 +171,34 @@ popup:
       mode: controls
       show: active
       row_action: more-info
+```
+
+## Compact badges
+
+Use `custom:entity-popup-badge` above a dashboard view when an issue needs a small, visible entry point. The badge uses Mushroom's template badge and opens the same popup. Keep issue discovery in a Home Assistant sensor; the badge only reads its `summary` and `items` attributes.
+
+```yaml
+type: custom:entity-popup-badge
+entity: binary_sensor.home_attention
+label: Needs attention
+content: "{{ state_attr(entity, 'summary') }}"
+icon: mdi:alert-circle-outline
+color: red
+popup:
+  title: Needs attention
+  sections:
+    - source: records
+      attribute: items
+      row_action: more-info
+      details:
+        - field: value
+        - field: last_changed
+          label: Updated
+          format: datetime
+visibility:
+  - condition: state
+    entity: binary_sensor.home_attention
+    state: "on"
 ```
 
 The [configuration reference](docs/configuration.md) covers the other sources, row details, and status options.

@@ -118,6 +118,62 @@ test("matching pollen and nested bin values need no dashboard sensor enumeration
   assert.equal(atPath({}, "__proto__"), undefined);
 });
 
+test("record sections keep report text and live entity context", () => {
+  const items = [
+    {
+      entity: "sensor.store_battery",
+      name: "Store room PIR",
+      value: "Battery not reporting",
+      kind: "unavailable",
+      severity: "unknown",
+    },
+    {
+      entity: "sensor.ro_filters",
+      name: "RO filters",
+      value: "80 days overdue",
+      kind: "service",
+      severity: "warning",
+    },
+  ];
+  const states = {
+    "binary_sensor.maintenance": state("on", "Maintenance", { items }),
+    "sensor.store_battery": {
+      ...state("unavailable", "Battery"),
+      last_changed: "2026-09-24T07:30:00Z",
+    },
+    "sensor.ro_filters": state("-80", "RO filters", { unit_of_measurement: "d" }),
+  };
+  const section = {
+    source: "records",
+    attribute: "items",
+    kind_icons: { unavailable: "mdi:cloud-off-outline", service: "mdi:wrench-clock" },
+    severity_colors: { unknown: "#ef776b", warning: "#e8a547" },
+  };
+  const result = collectSection(states, "binary_sensor.maintenance", section);
+  assert.deepEqual(
+    result.items.map((item) => item.name),
+    ["Store room PIR", "RO filters"],
+  );
+  assert.deepEqual(
+    result.items.map((item) => item.value),
+    ["Battery not reporting", "80 days overdue"],
+  );
+  assert.deepEqual(
+    result.items.map((item) => item.icon),
+    ["mdi:cloud-off-outline", "mdi:wrench-clock"],
+  );
+  assert.equal(result.items[0].last_changed, "2026-09-24T07:30:00Z");
+  assert.equal(collectSection({}, "binary_sensor.maintenance", section).membershipKnown, false);
+  assert.throws(
+    () =>
+      validateConfig({
+        entity: "binary_sensor.maintenance",
+        popup: { sections: [{ source: "records" }] },
+      }),
+    /needs an attribute/,
+  );
+});
+
 test("mixed groups omit other domains and explicit entity lists keep their order", () => {
   const states = {
     "light.floor": state("on", "Floor", { entity_id: ["switch.socket", "light.lamp"] }),
@@ -171,7 +227,7 @@ test("cover controls count open and opening states and use cover actions", () =>
   assert.equal(actionFor(controlFor("cover.b"), "opening"), null);
 });
 
-function environment(config, states) {
+function environment(config, states, componentType = "entity-popup-card") {
   let document;
   class Element extends EventTarget {
     constructor(tag = "div") {
@@ -302,7 +358,14 @@ function environment(config, states) {
   document = {
     activeElement: null,
     body: new Element("body"),
-    createElement: (tag) => new Element(tag),
+    createElement: (tag) => {
+      const element = new Element(tag);
+      if (tag === "mushroom-template-badge")
+        element.setConfig = (badgeConfig) => {
+          element.config = badgeConfig;
+        };
+      return element;
+    },
   };
   document.body._connected = true;
   document.activeElement = document.body;
@@ -324,6 +387,7 @@ function environment(config, states) {
     customElements: {
       get: (name) => classes.get(name),
       define: (name, type) => classes.set(name, type),
+      whenDefined: () => Promise.resolve(),
     },
     setTimeout: (callback) => {
       const id = nextTimer++;
@@ -333,8 +397,9 @@ function environment(config, states) {
     clearTimeout: (id) => timers.delete(id),
     console: { error: () => {} },
   });
-  const Card = classes.get("entity-popup-card");
+  const Card = classes.get(componentType);
   const card = new Card();
+  if (componentType === "entity-popup-badge") assert.deepEqual(card.attrs, {});
   card.setConfig(config);
   card.hass = {
     states,
@@ -539,6 +604,37 @@ test("Mushroom fire-dom-event opens the popup", async () => {
   assert.equal(env.card._dialog.open, true);
 });
 
+test("badge uses Mushroom's compact trigger and the shared popup", async () => {
+  const env = environment(
+    {
+      entity: "binary_sensor.maintenance_attention",
+      label: "Needs attention",
+      content: "4 issues",
+      color: "red",
+      popup: {
+        sections: [{ source: "records", attribute: "items", details: [{ field: "value" }] }],
+      },
+    },
+    {
+      "binary_sensor.maintenance_attention": state("on", "Maintenance", {
+        items: [{ entity: "sensor.filter", name: "Filter", value: "Due now" }],
+      }),
+      "sensor.filter": state("0", "Filter"),
+    },
+    "entity-popup-badge",
+  );
+  await flush();
+  assert.equal(env.card._card.tagName, "mushroom-template-badge");
+  assert.equal(env.card._card.config.label, "Needs attention");
+  assert.equal(env.card._card.config.tap_action.action, "fire-dom-event");
+  const event = new Event("ll-custom");
+  event.detail = { action: "fire-dom-event" };
+  event.composedPath = () => [env.card._card, env.card];
+  env.card.dispatchEvent(event);
+  assert.equal(env.card._dialog.open, true);
+  assert.equal(env.card._rows.get("0:record:0").name.textContent, "Filter");
+});
+
 function servicesAsJson(services) {
   return JSON.parse(JSON.stringify(services));
 }
@@ -589,6 +685,50 @@ test("read-only window popup has no control and exposes per-window details", asy
   row.control.dispatchEvent(new Event("click"));
   assert.equal(inspected, "binary_sensor.bedroom");
   assert.equal(env.card._dialog.open, false, "close details before opening native more-info");
+});
+
+test("maintenance report popup shows reason, change time, and native details", async () => {
+  const config = {
+    type: "custom:entity-popup-card",
+    entity: "binary_sensor.maintenance",
+    popup: {
+      title: "Maintenance",
+      sections: [
+        {
+          source: "records",
+          attribute: "items",
+          details: [
+            { field: "value" },
+            { field: "last_changed", label: "Updated", format: "datetime" },
+          ],
+          row_action: "more-info",
+        },
+      ],
+    },
+  };
+  const states = {
+    "binary_sensor.maintenance": state("on", "Maintenance", {
+      items: [
+        { entity: "sensor.store_battery", name: "Store room PIR", value: "Battery not reporting" },
+      ],
+    }),
+    "sensor.store_battery": {
+      ...state("unavailable", "Battery"),
+      last_changed: "2026-09-24T07:30:00Z",
+    },
+  };
+  const env = environment(config, states);
+  await flush();
+  env.card.dispatchEvent(env.tap("fire-dom-event"));
+  const row = env.card._rows.get("0:record:0");
+  assert.equal(row.name.textContent, "Store room PIR");
+  assert.match(row.detail.textContent, /Battery not reporting · Updated/);
+  let inspected;
+  env.card.addEventListener("hass-more-info", (event) => {
+    inspected = event.detail.entityId;
+  });
+  row.control.dispatchEvent(new Event("click"));
+  assert.equal(inspected, "sensor.store_battery");
 });
 
 test("show all keeps off controls visible and a native tile needs no tap config", async () => {

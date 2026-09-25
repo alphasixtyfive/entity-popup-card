@@ -64,7 +64,7 @@
   // src/data.js
   var ENTITY = /^[a-z_][a-z0-9_]*\.[a-z0-9_]+$/;
   var PATH = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$/;
-  var SOURCES = /* @__PURE__ */ new Set(["members", "entities", "match", "values"]);
+  var SOURCES = /* @__PURE__ */ new Set(["members", "entities", "match", "values", "records"]);
   var MODES = /* @__PURE__ */ new Set(["view", "controls"]);
   var PROTOTYPE_KEYS = /* @__PURE__ */ new Set(["__proto__", "prototype", "constructor"]);
   var readable = (value) => String(value ?? "").replaceAll("_", " ").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -105,7 +105,7 @@
       activeCount: 0,
       unavailable: [],
       membershipKnown: true,
-      sourceAvailable: !["members", "values"].includes(section.source) || !!root && !["unknown", "unavailable"].includes(root.state)
+      sourceAvailable: !["members", "values", "records"].includes(section.source) || !!root && !["unknown", "unavailable"].includes(root.state)
     };
     const seen = /* @__PURE__ */ new Set();
     const active = section.active_state || "on";
@@ -170,6 +170,28 @@
           color: section.value_colors?.[value]
         });
       }
+    } else if (section.source === "records") {
+      const records = result.sourceAvailable ? atPath(root?.attributes, section.attribute) : void 0;
+      result.membershipKnown = Array.isArray(records);
+      for (const [index, value] of (Array.isArray(records) ? records : []).entries()) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const entity = typeof value.entity === "string" && ENTITY.test(value.entity) ? value.entity : void 0;
+        const record = entity ? states?.[entity] : void 0;
+        const name = typeof value.name === "string" && value.name.trim() ? value.name : record?.attributes?.friendly_name || entity || `Item ${index + 1}`;
+        add({
+          key: `record:${index}`,
+          entity,
+          name,
+          state: record?.state ?? "unavailable",
+          icon: value.icon || section.kind_icons?.[value.kind] || record?.attributes?.icon || section.icon,
+          color: value.color || section.severity_colors?.[value.severity],
+          attributes: record?.attributes || {},
+          last_changed: record?.last_changed,
+          value: value.value,
+          kind: value.kind,
+          severity: value.severity
+        });
+      }
     }
     if (["members", "match"].includes(section.source)) {
       result.items.sort(sortName);
@@ -185,7 +207,7 @@
   var entryEntity = (entry) => typeof entry === "string" ? entry : entry?.entity;
   function validateSection(section) {
     if (!section || !SOURCES.has(section.source)) {
-      throw new Error("Choose a popup section source: members, entities, match, or values.");
+      throw new Error("Choose a popup section source: members, entities, match, values, or records.");
     }
     if (!MODES.has(section.mode || "view")) {
       throw new Error("Section mode must be view or controls.");
@@ -199,8 +221,8 @@
     if (section.source === "members" && !isPath(section.attribute || "entity_id")) {
       throw new Error("Invalid member attribute.");
     }
-    if (section.source === "values" && !isPath(section.attribute)) {
-      throw new Error("A values section needs an attribute.");
+    if (["values", "records"].includes(section.source) && !isPath(section.attribute)) {
+      throw new Error(`A ${section.source} section needs an attribute.`);
     }
     if (section.source === "entities" && (!Array.isArray(section.entities) || section.entities.some((entry) => !isEntity(entryEntity(entry))))) {
       throw new Error("An entities section needs valid entity IDs.");
@@ -249,7 +271,7 @@
   }
 
   // src/styles.css
-  var styles_default = ':host {\n  display: block;\n  min-width: 0;\n  height: 100%;\n  font-family: var(--ha-font-family-body, inherit);\n}\n.tile,\n.tile > * {\n  display: block;\n  height: 100%;\n  min-width: 0;\n}\n:host([compact]) {\n  height: auto;\n}\n:host([compact]) .tile,\n:host([compact]) .tile > * {\n  height: auto;\n}\ndialog {\n  box-sizing: border-box;\n  width: min(var(--entity-popup-width, 480px), calc(100vw - 24px));\n  max-height: min(80dvh, 720px);\n  padding: 0;\n  border: 1px solid var(--divider-color, #555);\n  border-radius: var(--ha-border-radius-3xl, 24px);\n  color: var(--primary-text-color, #212121);\n  background: var(\n    --ha-color-surface-default,\n    var(--ha-card-background, var(--card-background-color, #fff))\n  );\n  box-shadow: var(--ha-box-shadow-l, 0 12px 40px #0006);\n  overflow: auto;\n}\ndialog::backdrop {\n  background: #0007;\n}\n.header {\n  position: sticky;\n  top: 0;\n  z-index: 1;\n  display: flex;\n  align-items: center;\n  gap: var(--ha-space-3, 12px);\n  padding-block: var(--ha-space-3, 12px);\n  padding-inline: var(--ha-space-3, 12px) var(--ha-space-5, 20px);\n  background: inherit;\n}\nh2 {\n  margin: 0;\n  flex: 1;\n  min-width: 0;\n  font-size: var(--ha-font-size-xl, 20px);\n  line-height: 28px;\n  font-weight: var(--ha-font-weight-medium, 600);\n}\n.close {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 44px;\n  height: 44px;\n  border: 0;\n  border-radius: 50%;\n  background: transparent;\n  color: var(--primary-text-color);\n  cursor: pointer;\n}\n.close:hover,\n.row-button:hover,\n.switch:hover,\n.cover-action:hover {\n  background: var(--secondary-background-color, #8882);\n}\nbutton:focus-visible {\n  outline: 2px solid var(--primary-color);\n  outline-offset: 1px;\n}\n.body {\n  padding-block: var(--ha-space-4, 16px) var(--ha-space-6, 24px);\n  padding-inline: var(--ha-space-6, 24px);\n}\n.status,\n.empty,\n.unavailable {\n  margin: 0;\n  font-size: 14px;\n  line-height: 21px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.status {\n  margin-block-end: var(--ha-space-3, 12px);\n}\n.section + .section {\n  margin-block-start: var(--ha-space-5, 20px);\n}\nh3 {\n  margin: 12px 0 4px;\n  font-size: var(--ha-font-size-m, 14px);\n  line-height: 20px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  color: var(--secondary-text-color);\n}\nul {\n  list-style: none;\n  margin: 4px 0 0;\n  padding: 0;\n}\nli {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 56px;\n  padding: 4px 0;\n}\nli + li {\n  border-top: 1px solid var(--divider-color, #8883);\n}\nli ha-icon {\n  flex: none;\n  --mdc-icon-size: 22px;\n  color: var(--primary-color);\n}\n.copy {\n  flex: 1;\n  min-width: 0;\n}\n.name {\n  display: block;\n  font-size: var(--ha-font-size-m, 15px);\n  line-height: 22px;\n  overflow-wrap: anywhere;\n}\n.detail {\n  display: block;\n  font-size: var(--ha-font-size-s, 12px);\n  line-height: 18px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.row-button {\n  flex: 1;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 48px;\n  padding: 0;\n  border: 0;\n  border-radius: 6px;\n  background: transparent;\n  color: inherit;\n  font: inherit;\n  text-align: left;\n  cursor: pointer;\n}\n.row-button:only-child {\n  margin-inline: calc(-1 * var(--ha-space-3, 12px));\n  padding-inline: var(--ha-space-3, 12px);\n}\n.row-button ha-icon:last-child {\n  color: var(--secondary-text-color);\n  --mdc-icon-size: 18px;\n}\n.switch {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 48px;\n  height: 44px;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  cursor: pointer;\n}\n.switch:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.switch[aria-busy="true"] {\n  cursor: wait;\n}\n.track {\n  display: block;\n  box-sizing: border-box;\n  width: 36px;\n  height: 22px;\n  padding: 3px;\n  border-radius: 12px;\n  background: var(--disabled-color, #777);\n  transition: background 120ms;\n}\n.thumb {\n  display: block;\n  width: 16px;\n  height: 16px;\n  margin-inline-start: 0;\n  border-radius: 50%;\n  background: var(--card-background-color, #fff);\n  transition: margin-inline-start 120ms;\n}\n.switch[aria-checked="true"] .track {\n  background: var(--state-light-active-color, var(--primary-color, #03a9f4));\n}\n.switch[aria-checked="true"] .thumb {\n  margin-inline-start: 14px;\n}\n.cover-action {\n  flex: none;\n  min-width: 64px;\n  min-height: 36px;\n  padding: 0 12px;\n  border: 1px solid var(--divider-color, #8883);\n  border-radius: 18px;\n  background: transparent;\n  color: var(--primary-color);\n  font: inherit;\n  font-size: 14px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  cursor: pointer;\n}\n.cover-action:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.empty {\n  padding: 12px 0 4px;\n}\n.unavailable {\n  padding-top: 8px;\n}\n.error {\n  margin: 12px 0 0;\n  color: var(--error-color, #db4437);\n  font-size: 13px;\n  line-height: 20px;\n  white-space: pre-line;\n  overflow-wrap: anywhere;\n}\nli[data-active="false"] > ha-icon,\nli[data-active="false"] .row-button > ha-icon:first-child {\n  color: var(--secondary-text-color);\n}\nli[data-active="true"] > ha-icon,\nli[data-active="true"] .row-button > ha-icon:first-child {\n  color: var(--state-light-active-color, var(--primary-color));\n}\n[hidden] {\n  display: none !important;\n}\n@media (max-width: 870px), (max-height: 500px) {\n  dialog {\n    inset: auto 0 0;\n    width: 100%;\n    max-width: none;\n    max-height: calc(100dvh - max(var(--safe-area-inset-top, 0px), 48px));\n    margin: 0;\n    border-radius: var(--ha-border-radius-3xl, 24px) var(--ha-border-radius-3xl, 24px) 0 0;\n    border-inline: 0;\n    border-bottom: 0;\n  }\n  .body {\n    padding-bottom: calc(var(--ha-space-6, 24px) + var(--safe-area-inset-bottom, 0px));\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .track,\n  .thumb {\n    transition: none;\n  }\n}\n';
+  var styles_default = ':host {\n  display: block;\n  min-width: 0;\n  height: 100%;\n  font-family: var(--ha-font-family-body, inherit);\n}\n.tile,\n.tile > * {\n  display: block;\n  height: 100%;\n  min-width: 0;\n}\n:host([compact]) {\n  height: auto;\n}\n:host([compact]) .tile,\n:host([compact]) .tile > * {\n  height: auto;\n}\n:host([badge]) {\n  display: inline-block;\n  height: auto;\n}\n:host([badge]) .tile,\n:host([badge]) .tile > * {\n  height: auto;\n}\ndialog {\n  box-sizing: border-box;\n  width: min(var(--entity-popup-width, 480px), calc(100vw - 24px));\n  max-height: min(80dvh, 720px);\n  padding: 0;\n  border: 1px solid var(--divider-color, #555);\n  border-radius: var(--ha-border-radius-3xl, 24px);\n  color: var(--primary-text-color, #212121);\n  background: var(\n    --ha-color-surface-default,\n    var(--ha-card-background, var(--card-background-color, #fff))\n  );\n  box-shadow: var(--ha-box-shadow-l, 0 12px 40px #0006);\n  overflow: auto;\n}\ndialog::backdrop {\n  background: #0007;\n}\n.header {\n  position: sticky;\n  top: 0;\n  z-index: 1;\n  display: flex;\n  align-items: center;\n  gap: var(--ha-space-3, 12px);\n  padding-block: var(--ha-space-3, 12px);\n  padding-inline: var(--ha-space-3, 12px) var(--ha-space-5, 20px);\n  background: inherit;\n}\nh2 {\n  margin: 0;\n  flex: 1;\n  min-width: 0;\n  font-size: var(--ha-font-size-xl, 20px);\n  line-height: 28px;\n  font-weight: var(--ha-font-weight-medium, 600);\n}\n.close {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 44px;\n  height: 44px;\n  border: 0;\n  border-radius: 50%;\n  background: transparent;\n  color: var(--primary-text-color);\n  cursor: pointer;\n}\n.close:hover,\n.row-button:hover,\n.switch:hover,\n.cover-action:hover {\n  background: var(--secondary-background-color, #8882);\n}\nbutton:focus-visible {\n  outline: 2px solid var(--primary-color);\n  outline-offset: 1px;\n}\n.body {\n  padding-block: var(--ha-space-4, 16px) var(--ha-space-6, 24px);\n  padding-inline: var(--ha-space-6, 24px);\n}\n.status,\n.empty,\n.unavailable {\n  margin: 0;\n  font-size: 14px;\n  line-height: 21px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.status {\n  margin-block-end: var(--ha-space-3, 12px);\n}\n.section + .section {\n  margin-block-start: var(--ha-space-5, 20px);\n}\nh3 {\n  margin: 12px 0 4px;\n  font-size: var(--ha-font-size-m, 14px);\n  line-height: 20px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  color: var(--secondary-text-color);\n}\nul {\n  list-style: none;\n  margin: 4px 0 0;\n  padding: 0;\n}\nli {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 56px;\n  padding: 4px 0;\n}\nli + li {\n  border-top: 1px solid var(--divider-color, #8883);\n}\nli ha-icon {\n  flex: none;\n  --mdc-icon-size: 22px;\n  color: var(--primary-color);\n}\n.copy {\n  flex: 1;\n  min-width: 0;\n}\n.name {\n  display: block;\n  font-size: var(--ha-font-size-m, 15px);\n  line-height: 22px;\n  overflow-wrap: anywhere;\n}\n.detail {\n  display: block;\n  font-size: var(--ha-font-size-s, 12px);\n  line-height: 18px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.row-button {\n  flex: 1;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 48px;\n  padding: 0;\n  border: 0;\n  border-radius: 6px;\n  background: transparent;\n  color: inherit;\n  font: inherit;\n  text-align: left;\n  cursor: pointer;\n}\n.row-button:only-child {\n  margin-inline: calc(-1 * var(--ha-space-3, 12px));\n  padding-inline: var(--ha-space-3, 12px);\n}\n.row-button ha-icon:last-child {\n  color: var(--secondary-text-color);\n  --mdc-icon-size: 18px;\n}\n.switch {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 48px;\n  height: 44px;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  cursor: pointer;\n}\n.switch:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.switch[aria-busy="true"] {\n  cursor: wait;\n}\n.track {\n  display: block;\n  box-sizing: border-box;\n  width: 36px;\n  height: 22px;\n  padding: 3px;\n  border-radius: 12px;\n  background: var(--disabled-color, #777);\n  transition: background 120ms;\n}\n.thumb {\n  display: block;\n  width: 16px;\n  height: 16px;\n  margin-inline-start: 0;\n  border-radius: 50%;\n  background: var(--card-background-color, #fff);\n  transition: margin-inline-start 120ms;\n}\n.switch[aria-checked="true"] .track {\n  background: var(--state-light-active-color, var(--primary-color, #03a9f4));\n}\n.switch[aria-checked="true"] .thumb {\n  margin-inline-start: 14px;\n}\n.cover-action {\n  flex: none;\n  min-width: 64px;\n  min-height: 36px;\n  padding: 0 12px;\n  border: 1px solid var(--divider-color, #8883);\n  border-radius: 18px;\n  background: transparent;\n  color: var(--primary-color);\n  font: inherit;\n  font-size: 14px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  cursor: pointer;\n}\n.cover-action:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.empty {\n  padding: 12px 0 4px;\n}\n.unavailable {\n  padding-top: 8px;\n}\n.error {\n  margin: 12px 0 0;\n  color: var(--error-color, #db4437);\n  font-size: 13px;\n  line-height: 20px;\n  white-space: pre-line;\n  overflow-wrap: anywhere;\n}\nli[data-active="false"] > ha-icon,\nli[data-active="false"] .row-button > ha-icon:first-child {\n  color: var(--secondary-text-color);\n}\nli[data-active="true"] > ha-icon,\nli[data-active="true"] .row-button > ha-icon:first-child {\n  color: var(--state-light-active-color, var(--primary-color));\n}\n[hidden] {\n  display: none !important;\n}\n@media (max-width: 870px), (max-height: 500px) {\n  dialog {\n    inset: auto 0 0;\n    width: 100%;\n    max-width: none;\n    max-height: calc(100dvh - max(var(--safe-area-inset-top, 0px), 48px));\n    margin: 0;\n    border-radius: var(--ha-border-radius-3xl, 24px) var(--ha-border-radius-3xl, 24px) 0 0;\n    border-inline: 0;\n    border-bottom: 0;\n  }\n  .body {\n    padding-bottom: calc(var(--ha-space-6, 24px) + var(--safe-area-inset-bottom, 0px));\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .track,\n  .thumb {\n    transition: none;\n  }\n}\n';
 
   // src/card.js
   var STATE_UPDATE_TIMEOUT_MS = 15e3;
@@ -667,9 +689,49 @@
     }
   };
 
+  // src/badge.js
+  var EntityPopupBadge = class extends EntityPopupCard {
+    setConfig(config) {
+      this.setAttribute("badge", "");
+      super.setConfig(config);
+    }
+    async _buildCard() {
+      if (!this._config || !this.isConnected) return;
+      if (this._card) {
+        this._card.hass = this._hass;
+        return;
+      }
+      const revision = ++this._revision;
+      try {
+        await customElements.whenDefined("mushroom-template-badge");
+        if (revision !== this._revision || !this.isConnected) return;
+        const { popup, compact, card, grid_options, visibility, type, ...badgeConfig } = this._config;
+        const badge = document.createElement("mushroom-template-badge");
+        badge.setConfig({ ...badgeConfig, tap_action: { action: "fire-dom-event" } });
+        this._card = badge;
+        if (this._hass) badge.hass = this._hass;
+        this._tile.replaceChildren(badge);
+      } catch (error) {
+        if (revision !== this._revision || !this.isConnected) return;
+        this._tile.textContent = "Details unavailable";
+        console.error("Unable to load entity popup badge", error);
+      }
+    }
+  };
+
   // src/index.js
   if (!customElements.get("entity-popup-card"))
     customElements.define("entity-popup-card", EntityPopupCard);
+  if (!customElements.get("entity-popup-badge"))
+    customElements.define("entity-popup-badge", EntityPopupBadge);
+  window.customBadges = window.customBadges || [];
+  if (!window.customBadges.some((badge) => badge.type === "entity-popup-badge")) {
+    window.customBadges.push({
+      type: "entity-popup-badge",
+      name: "Entity Popup Badge",
+      description: "A compact status badge that opens a live list of related entities."
+    });
+  }
   window.customCards = window.customCards || [];
   if (!window.customCards.some((card) => card.type === "entity-popup-card")) {
     window.customCards.push({
