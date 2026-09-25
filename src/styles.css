@@ -19,7 +19,7 @@
 }
 dialog {
   box-sizing: border-box;
-  width: min(480px, calc(100vw - 24px));
+  width: min(var(--entity-popup-width, 480px), calc(100vw - 24px));
   max-height: min(80dvh, 720px);
   padding: 0;
   border: 1px solid var(--divider-color, #555);
@@ -153,6 +153,10 @@ li ha-icon {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+.row-button:only-child {
+  margin-inline: calc(-1 * var(--ha-space-3, 12px));
+  padding-inline: var(--ha-space-3, 12px);
 }
 .row-button ha-icon:last-child {
   color: var(--secondary-text-color);

@@ -20,6 +20,16 @@ On a phone, the same popup opens as a bottom sheet:
 
 ![Light popup as a phone bottom sheet](docs/screenshots/mobile-light-popup.png)
 
+The desktop popup is 480 pixels wide by default. Set `popup.width` to a whole number from 320 to 960 when longer names need more room. Narrow screens keep the full-width bottom sheet.
+
+```yaml
+popup:
+  width: 600
+  sections:
+    - source: entities
+      entities: [sensor.outdoor_air_quality]
+```
+
 ## Install
 
 Click the HACS button above, then download the repository. If the button does not find it yet, add `https://github.com/alphasixtyfive/entity-popup-card` in **HACS → Custom repositories**, select **Dashboard**, and download it. Refresh Home Assistant after installation.

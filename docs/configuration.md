@@ -10,6 +10,7 @@
 | `popup.status_text` | Fixed summary under the title. |
 | `popup.status_attribute` | One root attribute to show as the summary. |
 | `popup.status_attributes` | Several root attributes to join into a summary. |
+| `popup.width` | Optional desktop popup width in pixels, from 320 to 960. Defaults to 480; narrow screens still use a full-width bottom sheet. |
 | `popup.sections` | One or more lists, in display order. |
 | `compact` | Let a Mushroom tile use its natural height. |
 

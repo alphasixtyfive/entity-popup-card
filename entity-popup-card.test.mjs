@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import { atPath, collectSection } from "./src/data.js";
 import { actionFor, controlFor } from "./src/controls.js";
+import { validateConfig } from "./src/config.js";
 
 const file = fileURLToPath(new URL("./entity-popup-card.js", import.meta.url));
 const state = (value, name, attrs = {}) => ({
@@ -70,6 +71,22 @@ test("open windows use helper members without a fixed sensor list", () => {
     ["Kitchen window"],
   );
   assert.equal(result.activeCount, 1);
+});
+
+test("member names keep numeric, case-insensitive order", () => {
+  const states = {
+    "sensor.group": state("on", "Group", {
+      entity_id: ["sensor.ten", "sensor.two", "sensor.alpha"],
+    }),
+    "sensor.ten": state("on", "Room 10"),
+    "sensor.two": state("on", "room 2"),
+    "sensor.alpha": state("on", "Alpha"),
+  };
+  const result = collectSection(states, "sensor.group", { source: "members" });
+  assert.deepEqual(
+    result.items.map((item) => item.entity),
+    ["sensor.alpha", "sensor.two", "sensor.ten"],
+  );
 });
 
 test("matching pollen and nested bin values need no dashboard sensor enumeration", () => {
@@ -162,7 +179,14 @@ function environment(config, states) {
       this.tagName = tag;
       this.children = [];
       this.attrs = {};
-      this.style = {};
+      this.style = {
+        setProperty(name, value) {
+          this[name] = value;
+        },
+        removeProperty(name) {
+          delete this[name];
+        },
+      };
       this._connected = false;
       this.hidden = false;
       this.open = false;
@@ -330,6 +354,24 @@ function environment(config, states) {
   return { card, created, services, tap, timers, classes, browserWindow };
 }
 const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+test("popup width is optional, bounded, and resets when removed", async () => {
+  const config = {
+    entity: "sensor.air",
+    popup: {
+      width: 600,
+      sections: [{ source: "entities", entities: ["sensor.air"] }],
+    },
+  };
+  const env = environment(config, { "sensor.air": state("good", "Air") });
+  await flush();
+  assert.equal(env.card._dialog.style["--entity-popup-width"], "600px");
+  assert.throws(() => validateConfig({ ...config, popup: { ...config.popup, width: 319 } }));
+  assert.throws(() => validateConfig({ ...config, popup: { ...config.popup, width: 961 } }));
+  assert.throws(() => validateConfig({ ...config, popup: { ...config.popup, width: "600" } }));
+  env.card.setConfig({ ...config, popup: { sections: config.popup.sections } });
+  assert.equal(env.card._dialog.style["--entity-popup-width"], undefined);
+});
 
 test("lights popup preserves tile icon action and has guarded, reversible controls", async () => {
   const config = {

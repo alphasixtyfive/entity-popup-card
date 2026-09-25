@@ -11,8 +11,8 @@ const readable = (value) =>
     .replaceAll("_", " ")
     .replaceAll("-", " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
-const sortName = (a, b) =>
-  a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const sortName = (a, b) => nameCollator.compare(a.name, b.name);
 
 function atPath(value, path) {
   if (!PATH.test(path || "")) return undefined;

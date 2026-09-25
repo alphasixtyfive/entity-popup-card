@@ -91,6 +91,8 @@ export class EntityPopupCard extends HTMLElement {
   setConfig(config) {
     validateConfig(config);
     this._config = config;
+    if (config.popup.width === undefined) this._dialog.style.removeProperty("--entity-popup-width");
+    else this._dialog.style.setProperty("--entity-popup-width", `${config.popup.width}px`);
     if (config.compact) this.setAttribute("compact", "");
     else this.removeAttribute("compact");
     this._revision++;

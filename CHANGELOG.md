@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Wider clickable highlight for read-only rows, with the original text and control spacing preserved.
+- Optional desktop popup width from 320 to 960 pixels.
+- Faster sorting for large member and matching-entity lists.
+
 ## 1.0.0
 
 - Initial public release of the entity popup card.

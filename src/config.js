@@ -98,5 +98,11 @@ export function validateConfig(config) {
   ) {
     throw new Error("Invalid popup status attributes.");
   }
+  if (
+    config.popup.width !== undefined &&
+    (!Number.isInteger(config.popup.width) || config.popup.width < 320 || config.popup.width > 960)
+  ) {
+    throw new Error("Popup width must be a whole number from 320 to 960 pixels.");
+  }
   config.popup.sections.forEach(validateSection);
 }
