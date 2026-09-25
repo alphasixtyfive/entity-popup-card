@@ -1,0 +1,9 @@
+{
+  "name": "entity-popup-card",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A compact live entity popup for Home Assistant dashboards",
+  "scripts": {
+    "test": "node --check entity-popup-card.js && node --test entity-popup-card.test.cjs"
+  }
+}
