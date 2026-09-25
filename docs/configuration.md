@@ -27,17 +27,17 @@
 | Option | Purpose |
 | --- | --- |
 | `title` | Heading above the section. |
-| `mode` | `view` (default) or `controls`. Controls work with `members` and `entities` for on/off lights, switches, fans, and input booleans. |
+| `mode` | `view` (default) or `controls`. Controls work with `members` and `entities` for lights, switches, fans, input booleans, and covers. |
 | `show` | `all` (default) or `active`. `active` shows entities whose state matches `active_state`. |
 | `row_action` | `more-info` opens Home Assistant's native dialog when the row name is tapped. |
 | `show_state` | Show a state line under each entity name. Home Assistant formats the state and unit. |
 | `state_labels` | Optional replacements for specific state values. |
 | `details` | Extra values in the row's detail line from an `attribute` or `field`; accepts `label`, `unit`, and `format: datetime`. |
 | `icon`, `active_icon`, `inactive_icon` | Row icon settings. An entity's own icon takes precedence. |
-| `active_state`, `inactive_state` | State values used for counts and filtering; default to `on` and `off`. |
+| `active_state`, `inactive_state` | State values used for counts and filtering in `view` sections; default to `on` and `off`. Control sections use each domain's states. |
 | `singular`, `plural`, `active_label` | Words used in a member section's automatic summary. |
 | `empty_text` | Message shown when the section has no rows. |
 
-`mode: controls` calls the standard `turn_on` or `turn_off` service for each row's domain. It disables controls while the service call is pending or when the entity is unavailable. With `show: active`, an entity turned off inside the popup remains visible until you close it, so the action is easy to reverse.
+`mode: controls` calls `turn_on` or `turn_off` for lights, switches, fans, and input booleans. Covers use `open_cover` and `close_cover`, with a labeled button instead of a switch. Buttons are disabled while a service call is pending, when a cover is moving, or when an entity is unavailable. With `show: active`, an entity turned off or closed inside the popup remains visible until you close it, so the action is easy to reverse.
 
 For `values`, each list item is read only. For custom summaries, use `status_text` or root attributes; otherwise only member sections display an automatic count.

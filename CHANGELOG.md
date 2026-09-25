@@ -7,3 +7,5 @@
 - Live member, entity, pattern, and value lists.
 - Quick on/off controls with links to native more-info.
 - Mobile bottom sheet layout and Home Assistant theme tokens.
+- Readable source modules in `src/`, with a reproducible HACS build.
+- Cover controls with Open and Close actions.

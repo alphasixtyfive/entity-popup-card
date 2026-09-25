@@ -6,6 +6,8 @@ A small Home Assistant dashboard card that opens a live list of related entities
 
 It works with the built-in Tile card. If you already use Mushroom template cards, you can keep those too.
 
+The maintained source is in [`src/`](src/). The root `entity-popup-card.js` is generated from those files so HACS can install one JavaScript resource.
+
 ## Screenshots
 
 These previews use example entities. The popup picks up your Home Assistant theme.
@@ -116,6 +118,30 @@ popup:
       row_action: more-info
 ```
 
+## Covers
+
+Covers get **Open** and **Close** buttons instead of switches. While a cover is opening or closing, the button waits for its next state. Tap the row name for Home Assistant's full cover controls, including position and tilt where supported.
+
+![Cover popup with Open and Close actions](docs/screenshots/cover-popup.png)
+
+```yaml
+type: custom:entity-popup-card
+entity: cover.living_room
+card:
+  type: tile
+  entity: cover.living_room
+popup:
+  title: Blinds
+  sections:
+    - source: entities
+      entities:
+        - cover.living_room
+        - cover.bedroom
+      mode: controls
+      show_state: true
+      row_action: more-info
+```
+
 ## Mushroom tiles
 
 If you leave out `card:`, the card wraps a Mushroom template card. Put Mushroom's usual `primary`, `secondary`, `icon`, and `icon_tap_action` settings at the top level. Install Mushroom separately. The popup handles the tile's tap action, so you do not need to set `tap_action: fire-dom-event`.
@@ -141,6 +167,6 @@ The [configuration reference](docs/configuration.md) covers the other sources, r
 
 ## Development
 
-The card is one JavaScript file with no build step. Run `npm test` or `node --test entity-popup-card.test.cjs` before changing it. It has been tested with Home Assistant 2026.9.3.
+The files in `src/` are the source of truth. Run `npm ci`, edit the source, then run `npm run build` to update the HACS file. `npm test` checks the behavior and confirms that the generated file matches the source. It has been tested with Home Assistant 2026.9.3.
 
 The dialog follows Home Assistant's current [more-info layout](https://github.com/home-assistant/frontend/blob/dev/src/dialogs/more-info/ha-more-info-dialog.ts) and [dashboard card API](https://developers.home-assistant.io/docs/frontend/custom-ui/custom-card/). The row details stay native; this card does not copy Home Assistant's light color, brightness, or history controls.

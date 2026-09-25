@@ -1,10 +1,12 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const vm = require("node:vm");
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+import { fileURLToPath } from "node:url";
+import { atPath, collectSection } from "./src/data.js";
+import { actionFor, controlFor } from "./src/controls.js";
 
-const file = require("node:path").join(__dirname, "entity-popup-card.js");
-const { atPath, collectSection } = require(file);
+const file = fileURLToPath(new URL("./entity-popup-card.js", import.meta.url));
 const state = (value, name, attrs = {}) => ({
   state: value,
   attributes: { friendly_name: name, ...attrs },
@@ -34,7 +36,7 @@ test("member groups flatten safely and count only current active leaves", () => 
   assert.equal(result.activeCount, 1);
   assert.deepEqual(
     result.unavailable.map((item) => item.entity),
-    ["light.floor", "light.missing"],
+    ["light.missing"],
   );
   assert.equal(result.membershipKnown, true);
   assert.equal(collectSection({}, "light.floor", section).membershipKnown, false);
@@ -123,6 +125,33 @@ test("mixed groups omit other domains and explicit entity lists keep their order
     }).items.map((item) => item.entity),
     ["switch.socket", "light.lamp"],
   );
+});
+
+test("cover controls count open and opening states and use cover actions", () => {
+  const states = {
+    "cover.floor": state("open", "Floor covers", {
+      entity_id: ["cover.a", "cover.b", "cover.c", "cover.d"],
+    }),
+    "cover.a": state("open", "A"),
+    "cover.b": state("opening", "B"),
+    "cover.c": state("closed", "C"),
+    "cover.d": state("closing", "D"),
+  };
+  const result = collectSection(states, "cover.floor", {
+    source: "members",
+    domain: "cover",
+    mode: "controls",
+    show: "active",
+  });
+  assert.equal(result.activeCount, 2);
+  assert.deepEqual(
+    result.items.map((item) => item.entity),
+    ["cover.a", "cover.b"],
+  );
+  assert.equal(result.unavailable.length, 0);
+  assert.equal(actionFor(controlFor("cover.a"), "open").service, "close_cover");
+  assert.equal(actionFor(controlFor("cover.c"), "closed").service, "open_cover");
+  assert.equal(actionFor(controlFor("cover.b"), "opening"), null);
 });
 
 function environment(config, states) {
@@ -258,9 +287,6 @@ function environment(config, states) {
       const child = new Element("mushroom-template-card");
       child.config = childConfig;
       child.attachShadow();
-      const opener = new Element("button");
-      opener.parent = child.shadowRoot;
-      child.shadowRoot.nodes['[role="button"][aria-labelledby="info"]'] = opener;
       created.push(child);
       return child;
     },
@@ -358,13 +384,13 @@ test("lights popup preserves tile icon action and has guarded, reversible contro
   assert.equal(row.control.attrs["aria-checked"], "false");
   assert.equal(row.detail.textContent, "Off");
   assert.equal(
-    env.card._sections.children[0]._parts.list.children.length,
+    env.card._sectionNodes.get(0).list.children.length,
     1,
     "off row remains reversible until close",
   );
   states["light.floor"].attributes.entity_id = [];
   env.card.hass = env.card._hass;
-  assert.equal(env.card._sections.children[0]._parts.list.children.length, 0);
+  assert.equal(env.card._sectionNodes.get(0).list.children.length, 0);
   await env.card._change(0, "light.a");
   assert.equal(env.services.length, 1, "removed member cannot be controlled");
   states["light.floor"].attributes.entity_id = ["light.b"];
@@ -378,6 +404,97 @@ test("lights popup preserves tile icon action and has guarded, reversible contro
   env.card._rows.get("0:light.b").rowButton.dispatchEvent(new Event("click"));
   assert.equal(inspected, "light.b");
   assert.equal(env.card._dialog.open, false);
+});
+
+test("cover rows use labeled buttons and wait through movement", async () => {
+  const config = {
+    entity: "cover.floor",
+    card: { type: "tile", entity: "cover.floor" },
+    popup: {
+      sections: [
+        {
+          source: "members",
+          domain: "cover",
+          mode: "controls",
+          show: "all",
+          row_action: "more-info",
+        },
+      ],
+    },
+  };
+  const states = {
+    "cover.floor": state("open", "Floor covers", { entity_id: ["cover.blind"] }),
+    "cover.blind": state("open", "Blind"),
+  };
+  const env = environment(config, states);
+  await flush();
+  env.card.dispatchEvent(env.tap("fire-dom-event"));
+  const row = env.card._rows.get("0:cover.blind");
+  assert.equal(row.control.className, "cover-action");
+  assert.equal(row.control.attrs.role, undefined);
+  assert.equal(row.control.textContent, "Close");
+  assert.equal(row.control.attrs["aria-label"], "Close Blind");
+  row.control.dispatchEvent(new Event("click"));
+  await flush();
+  assert.deepEqual(servicesAsJson(env.services), [
+    ["cover", "close_cover", { entity_id: "cover.blind" }],
+  ]);
+  states["cover.blind"].state = "closing";
+  env.card.hass = env.card._hass;
+  assert.equal(row.control.disabled, true);
+  assert.equal(row.control.textContent, "Moving");
+  states["cover.blind"].state = "closed";
+  env.card.hass = env.card._hass;
+  assert.equal(row.control.disabled, false);
+  assert.equal(row.control.textContent, "Open");
+});
+
+test("an active control list keeps the configured entity order", async () => {
+  const config = {
+    entity: "switch.b",
+    card: { type: "tile", entity: "switch.b" },
+    popup: {
+      sections: [
+        {
+          source: "entities",
+          entities: ["switch.b", "switch.a"],
+          mode: "controls",
+          show: "active",
+        },
+      ],
+    },
+  };
+  const states = {
+    "switch.a": state("on", "A"),
+    "switch.b": state("on", "B"),
+  };
+  const env = environment(config, states);
+  await flush();
+  env.card.dispatchEvent(env.tap("fire-dom-event"));
+  const rows = [env.card._rows.get("0:switch.b").row, env.card._rows.get("0:switch.a").row];
+  assert.deepEqual(env.card._sectionNodes.get(0).list.children, rows);
+  states["switch.b"].state = "off";
+  env.card.hass = env.card._hass;
+  assert.deepEqual(env.card._sectionNodes.get(0).list.children, rows);
+});
+
+test("Mushroom fire-dom-event opens the popup", async () => {
+  const env = environment(
+    {
+      entity: "sensor.air",
+      primary: "Air",
+      popup: {
+        sections: [{ source: "entities", entities: ["sensor.air"], show_state: true }],
+      },
+    },
+    { "sensor.air": state("good", "Air") },
+  );
+  await flush();
+  const event = new Event("ll-custom");
+  event.detail = { action: "fire-dom-event" };
+  event.composedPath = () => [env.card._card, env.card];
+  env.card.dispatchEvent(event);
+  assert.equal(env.card._dialog.open, true);
 });
 
 function servicesAsJson(services) {
