@@ -6,6 +6,18 @@ A small Home Assistant dashboard card that opens a live list of related entities
 
 It works with the built-in Tile card. If you already use Mushroom template cards, you can keep those too.
 
+## Screenshots
+
+These previews use example entities. The popup picks up your Home Assistant theme.
+
+| Light controls | Air & pollen |
+| --- | --- |
+| ![Light popup with two quick switches](docs/screenshots/light-popup.png) | ![Air and pollen readings in the popup](docs/screenshots/air-popup.png) |
+
+On a phone, the same popup opens as a bottom sheet:
+
+![Light popup as a phone bottom sheet](docs/screenshots/mobile-light-popup.png)
+
 ## Install
 
 Click the HACS button above, then download the repository. If the button does not find it yet, add `https://github.com/alphasixtyfive/entity-popup-card` in **HACS → Custom repositories**, select **Dashboard**, and download it. Refresh Home Assistant after installation.
