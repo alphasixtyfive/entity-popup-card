@@ -113,6 +113,52 @@ popup:
 
 `bulk_label` applies each active control's normal off action without repeating the entity list. Matching controls are sent in one Home Assistant service call. Buttons are disabled when their entity is unavailable. A service button reports a failed call, but does not claim the resulting devices reached a particular state.
 
+## Mix controls, readings, and buttons
+
+Sections appear in the order you list them. Each can show controls or read-only entities. `status_text` adds a short line under the title, and `actions` adds service buttons such as scenes or scripts. `bulk_label` is optional on each control section; leave it out when you do not want a **Turn all off** button.
+
+```yaml
+type: custom:entity-popup-card
+summary_tile:
+  name: Living room
+  icon: mdi:sofa
+popup:
+  title: Living room
+  status_text: Lights, climate, and shortcuts
+  sections:
+    - title: Lights and fan
+      source: entities
+      mode: controls
+      row_action: more-info
+      show_state: true
+      bulk_label: Turn all off
+      entities:
+        - light.living_room_lamp
+        - fan.living_room
+    - title: Blinds
+      source: entities
+      mode: controls
+      row_action: more-info
+      entities:
+        - cover.living_room
+    - title: Climate
+      source: entities
+      show_state: true
+      row_action: more-info
+      entities:
+        - sensor.living_room_temperature
+  actions_title: Shortcuts
+  actions:
+    - entity: scene.movie_night
+      service: scene.turn_on
+      name: Movie night
+    - entity: script.good_night
+      service: script.turn_on
+      name: Good night
+```
+
+Replace the example entity IDs with yours. The bulk button affects only **Lights and fan**; the cover remains a separate control. Service buttons stay available while a light is changing.
+
 ## A short sensor list
 
 The popup can also show selected readings. It keeps your chosen order and uses Home Assistant's state formatting, including units and translated states when available.

@@ -171,18 +171,28 @@ h3 {
 ul {
   display: flex;
   flex-direction: column;
-  gap: var(--entities-card-row-gap, var(--card-row-gap, 8px));
+  gap: var(--ha-space-4, 16px);
   list-style: none;
   margin: 4px 0 0;
   padding: 0;
 }
 li {
   box-sizing: border-box;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 56px;
   padding: 4px var(--ha-space-3, 12px);
+}
+li + li::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--ha-space-2, 8px));
+  inset-inline: var(--ha-space-3, 12px);
+  height: 1px;
+  background: var(--divider-color, #8883);
+  pointer-events: none;
 }
 li ha-icon {
   flex: none;
@@ -297,6 +307,11 @@ li ha-icon {
   color: var(--primary-text-color);
   font: inherit;
   cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.bulk-button:not(:disabled):hover,
+.bulk-button:not(:disabled):focus-visible {
+  background: var(--ha-color-fill-neutral-quiet-hover, #8882);
 }
 .bulk-button:disabled {
   cursor: default;
@@ -324,6 +339,11 @@ li ha-icon {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.action-button:not(:disabled):hover,
+.action-button:not(:disabled):focus-visible {
+  background: var(--ha-color-fill-neutral-normal-hover, #8883);
 }
 .action-button ha-icon {
   flex: none;

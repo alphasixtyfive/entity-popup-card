@@ -516,6 +516,47 @@ test("a generic room tile shows the first control count and offers configured ac
   assert.match(env.card._error.textContent, /Morning: Couldn't run the action/);
 });
 
+test("scene buttons stay available while a light command is pending", async () => {
+  const config = {
+    summary_tile: { name: "Room" },
+    popup: {
+      sections: [{ source: "entities", mode: "controls", entities: ["light.lamp"] }],
+      actions: [{ entity: "scene.evening", service: "scene.turn_on", name: "Evening" }],
+    },
+  };
+  const states = {
+    "light.lamp": state("off", "Lamp"),
+    "scene.evening": state("2026-09-26T18:00:00+00:00", "Evening"),
+  };
+  const env = environment(config, states);
+  const calls = [];
+  let finishLight;
+  env.card._hass.callService = (...args) => {
+    calls.push(args);
+    return args[0] === "light"
+      ? new Promise((resolve) => { finishLight = resolve; })
+      : Promise.resolve();
+  };
+  env.card._summaryParts.button.dispatchEvent(new Event("click"));
+  const scene = env.card._actionButtons[0].button;
+  const light = env.card._rows.get("0:light.lamp").control;
+  light.dispatchEvent(new Event("click"));
+  assert.equal(env.card._operations.size, 1);
+  assert.equal(scene.disabled, false);
+  assert.equal(env.card._actionButtons[0].button, scene);
+
+  scene.dispatchEvent(new Event("click"));
+  assert.equal(env.card._operations.size, 0);
+  await flush();
+  assert.deepEqual(servicesAsJson(calls), [
+    ["light", "turn_on", { entity_id: "light.lamp" }],
+    ["scene", "turn_on", { entity_id: "scene.evening" }],
+  ]);
+  finishLight();
+  await flush();
+  assert.equal(env.card._error.hidden, true);
+});
+
 test("generic popup actions require a valid entity and service", () => {
   const base = {
     entity: "light.lamp",

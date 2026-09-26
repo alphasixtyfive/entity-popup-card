@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.3
+
+- Scene buttons stay available during unrelated light changes instead of briefly dimming. Starting a scene supersedes pending light feedback cleanly.
+- Dividers return between popup rows, centered in generous space so they do not crowd the hover highlight. Two-line rows keep a 56px minimum height.
+- Service and bulk buttons use Home Assistant's neutral hover color. A new example shows mixed controls, readings, optional text, and service buttons in one popup.
+
 ## 1.3.2
 
 - Popup rows use Home Assistant's entity-row spacing instead of dividers, leaving clear space around the hover highlight.

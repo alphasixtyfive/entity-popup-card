@@ -520,8 +520,7 @@ export class EntityPopupCard extends HTMLElement {
       const available = !!record && !["unknown", "unavailable"].includes(record.state);
       parts.name.textContent = action.name || record?.attributes?.friendly_name || action.entity;
       parts.icon.icon = action.icon || record?.attributes?.icon || "mdi:play";
-      parts.button.disabled =
-        !available || this._actionPending.size > 0 || this._operations.size > 0;
+      parts.button.disabled = !available || this._actionPending.size > 0;
       parts.button.setAttribute(
         "aria-label",
         available ? parts.name.textContent : `${parts.name.textContent} unavailable`,
@@ -540,10 +539,10 @@ export class EntityPopupCard extends HTMLElement {
       !state ||
       ["unknown", "unavailable"].includes(state) ||
       this._actionPending.size ||
-      this._operations.size ||
       typeof this._hass?.callService !== "function"
     )
       return;
+    this._clearOperations();
     const pending = {};
     this._actionPending.set(index, pending);
     this._errors.delete(`action:${index}`);
