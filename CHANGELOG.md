@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- Popup rows use Home Assistant's entity-row spacing instead of dividers, leaving clear space around the hover highlight.
+
 ## 1.3.1
 
 - Summary tiles use compact text sizing and stretch within their dashboard cell, aligning with adjacent tiles.
