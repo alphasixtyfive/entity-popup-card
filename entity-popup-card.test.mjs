@@ -235,6 +235,7 @@ function environment(config, states, componentType = "entity-popup-card") {
       this.tagName = tag;
       this.children = [];
       this.attrs = {};
+      this.dataset = {};
       this.style = {
         setProperty(name, value) {
           this[name] = value;
@@ -318,6 +319,9 @@ function environment(config, states, componentType = "entity-popup-card") {
         "h2",
         ".status",
         ".sections",
+        ".actions",
+        ".actions h3",
+        ".action-grid",
         ".error",
         ".close",
       ]) {
@@ -436,6 +440,107 @@ test("popup width is optional, bounded, and resets when removed", async () => {
   assert.throws(() => validateConfig({ ...config, popup: { ...config.popup, width: "600" } }));
   env.card.setConfig({ ...config, popup: { sections: config.popup.sections } });
   assert.equal(env.card._dialog.style["--entity-popup-width"], undefined);
+});
+
+test("a generic room tile shows the first control count and offers configured actions", async () => {
+  const config = {
+    entity: "light.lamp",
+    summary_tile: { name: "Room", icon: "mdi:lightbulb-multiple" },
+    popup: {
+      title: "Room lights",
+      actions_title: "Scenes",
+      sections: [
+        {
+          source: "entities",
+          domain: "light",
+          mode: "controls",
+          show_state: true,
+          singular: "light",
+          plural: "lights",
+          active_label: "on",
+          bulk_label: "Turn all off",
+          entities: [{ entity: "light.lamp", name: "Lamp", icon: "mdi:floor-lamp" }],
+        },
+      ],
+      actions: [
+        {
+          entity: "scene.morning",
+          service: "scene.turn_on",
+          name: "Morning",
+          icon: "mdi:weather-sunny",
+        },
+      ],
+    },
+  };
+  const states = {
+    "light.lamp": state("on", "Lamp"),
+    "scene.morning": state("2026-09-26T09:00:00+00:00", "Morning"),
+  };
+  const env = environment(config, states);
+  assert.equal(env.card._summaryParts.state.textContent, "1 light on");
+  assert.equal(env.card._summaryParts.icon.icon, "mdi:lightbulb-multiple");
+  env.card._summaryParts.button.dispatchEvent(new Event("click"));
+  assert.equal(env.card._status.textContent, "1 light on");
+  assert.equal(env.card._rows.get("0:light.lamp").icon.icon, "mdi:floor-lamp");
+  assert.equal(env.card._actionsTitle.textContent, "Scenes");
+  const scene = env.card._actionButtons[0].button;
+  assert.equal(scene.disabled, false);
+  scene.dispatchEvent(new Event("click"));
+  await flush();
+  assert.deepEqual(servicesAsJson(env.services), [
+    ["scene", "turn_on", { entity_id: "scene.morning" }],
+  ]);
+  states["scene.morning"].state = "unavailable";
+  env.card.hass = env.card._hass;
+  assert.equal(scene.disabled, true);
+  await env.card._runAction(0);
+  assert.equal(env.services.length, 1);
+  const bulk = env.card._sectionNodes.get(0).bulk;
+  assert.equal(bulk.disabled, false);
+  bulk.dispatchEvent(new Event("click"));
+  await flush();
+  assert.deepEqual(servicesAsJson(env.services[1]), [
+    "light",
+    "turn_off",
+    { entity_id: "light.lamp" },
+  ]);
+  states["light.lamp"].state = "off";
+  env.card.hass = env.card._hass;
+  assert.equal(bulk.disabled, true);
+  assert.equal(env.card._summaryParts.state.textContent, "0 lights on");
+  states["scene.morning"].state = "2026-09-26T09:00:00+00:00";
+  env.card._hass.callService = () => Promise.reject(new Error("service failed"));
+  env.card.hass = env.card._hass;
+  scene.dispatchEvent(new Event("click"));
+  await flush();
+  assert.match(env.card._error.textContent, /Morning: Couldn't run the action/);
+});
+
+test("generic popup actions require a valid entity and service", () => {
+  const base = {
+    entity: "light.lamp",
+    popup: { sections: [{ source: "entities", entities: ["light.lamp"] }] },
+  };
+  assert.throws(
+    () =>
+      validateConfig({
+        ...base,
+        popup: { ...base.popup, actions: [{ entity: "scene.morning", service: "bad" }] },
+      }),
+    /actions need/,
+  );
+  assert.throws(
+    () =>
+      validateConfig({
+        ...base,
+        popup: { ...base.popup, actions: [{ entity: "not-an-entity", service: "scene.turn_on" }] },
+      }),
+    /actions need/,
+  );
+  assert.throws(
+    () => validateConfig({ ...base, summary_tile: { name: "Room" }, card: { type: "tile" } }),
+    /summary tile/,
+  );
 });
 
 test("lights popup preserves tile icon action and has guarded, reversible controls", async () => {

@@ -34,14 +34,14 @@ function ids(value) {
   return null;
 }
 
-function entityItem(states, id, section, name) {
+function entityItem(states, id, section, name, icon) {
   const record = states?.[id];
   return {
     key: id,
     entity: id,
     name: name || record?.attributes?.friendly_name || id,
     state: record?.state ?? "unavailable",
-    icon: record?.attributes?.icon || section.icon,
+    icon: icon || record?.attributes?.icon || section.icon,
     attributes: record?.attributes || {},
     last_changed: record?.last_changed,
   };
@@ -101,7 +101,15 @@ function collectSection(states, rootEntity, section) {
   } else if (section.source === "entities") {
     for (const entry of section.entities) {
       const id = typeof entry === "string" ? entry : entry.entity;
-      add(entityItem(states, id, section, typeof entry === "object" ? entry.name : undefined));
+      add(
+        entityItem(
+          states,
+          id,
+          section,
+          typeof entry === "object" ? entry.name : undefined,
+          typeof entry === "object" ? entry.icon : undefined,
+        ),
+      );
     }
   } else if (section.source === "match") {
     for (const id of Object.keys(states || {})) {

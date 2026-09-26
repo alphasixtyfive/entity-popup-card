@@ -4,6 +4,8 @@ import { CONTROL_TYPES, controlFor } from "./controls.js";
 const isEntity = (value) => typeof value === "string" && ENTITY.test(value);
 const isPath = (value) => typeof value === "string" && PATH.test(value);
 const entryEntity = (entry) => (typeof entry === "string" ? entry : entry?.entity);
+const isService = (value) =>
+  typeof value === "string" && /^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$/.test(value);
 
 function validateSection(section) {
   if (!section || !SOURCES.has(section.source)) {
@@ -17,6 +19,14 @@ function validateSection(section) {
   }
   if (section.row_action && !["more-info", "none"].includes(section.row_action)) {
     throw new Error("Row action must be more-info or none.");
+  }
+  if (
+    section.bulk_label !== undefined &&
+    (section.mode !== "controls" ||
+      typeof section.bulk_label !== "string" ||
+      !section.bulk_label.trim())
+  ) {
+    throw new Error("A bulk label needs a control section and non-empty text.");
   }
 
   if (section.source === "members" && !isPath(section.attribute || "entity_id")) {
@@ -88,6 +98,17 @@ export function validateConfig(config) {
   ) {
     throw new Error("The card option needs a Lovelace card type.");
   }
+  if (
+    config.summary_tile &&
+    (config.card ||
+      typeof config.summary_tile !== "object" ||
+      Array.isArray(config.summary_tile) ||
+      typeof config.summary_tile.name !== "string" ||
+      !config.summary_tile.name.trim() ||
+      (config.summary_tile.icon !== undefined && typeof config.summary_tile.icon !== "string"))
+  ) {
+    throw new Error("A summary tile needs a name and optional icon, without a card option.");
+  }
   if (config.popup.status_attribute && !isPath(config.popup.status_attribute)) {
     throw new Error("Invalid popup status attribute.");
   }
@@ -103,6 +124,20 @@ export function validateConfig(config) {
     (!Number.isInteger(config.popup.width) || config.popup.width < 320 || config.popup.width > 960)
   ) {
     throw new Error("Popup width must be a whole number from 320 to 960 pixels.");
+  }
+  if (
+    config.popup.actions !== undefined &&
+    (!Array.isArray(config.popup.actions) ||
+      config.popup.actions.some(
+        (action) =>
+          !action ||
+          !isEntity(action.entity) ||
+          !isService(action.service) ||
+          (action.name !== undefined && (typeof action.name !== "string" || !action.name.trim())) ||
+          (action.icon !== undefined && typeof action.icon !== "string"),
+      ))
+  ) {
+    throw new Error("Popup actions need an entity, a domain.service, and optional name and icon.");
   }
   config.popup.sections.forEach(validateSection);
 }

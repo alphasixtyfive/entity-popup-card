@@ -28,18 +28,23 @@ export class EntityPopupCard extends HTMLElement {
     this._retained = new Map();
     this._operations = new Map();
     this._errors = new Map();
+    this._actionPending = new Map();
+    this._actionButtons = [];
     this.shadowRoot.innerHTML = `
       <style>${POPUP_STYLES}</style>
       <div class="tile"></div>
       <dialog aria-labelledby="entity-popup-title" aria-describedby="entity-popup-status">
         <div class="header"><button class="close" type="button" aria-label="Close"><ha-icon icon="mdi:close" aria-hidden="true"></ha-icon></button><h2 id="entity-popup-title"></h2></div>
-        <div class="body"><p class="status" id="entity-popup-status"></p><div class="sections"></div><p class="error" role="alert" hidden></p></div>
+        <div class="body"><p class="status" id="entity-popup-status"></p><div class="sections"></div><div class="actions" hidden><h3></h3><div class="action-grid"></div></div><p class="error" role="alert" hidden></p></div>
       </dialog>`;
     this._tile = this.shadowRoot.querySelector(".tile");
     this._dialog = this.shadowRoot.querySelector("dialog");
     this._title = this.shadowRoot.querySelector("h2");
     this._status = this.shadowRoot.querySelector(".status");
     this._sections = this.shadowRoot.querySelector(".sections");
+    this._actions = this.shadowRoot.querySelector(".actions");
+    this._actionsTitle = this.shadowRoot.querySelector(".actions h3");
+    this._actionGrid = this.shadowRoot.querySelector(".action-grid");
     this._error = this.shadowRoot.querySelector(".error");
     this._close = this.shadowRoot.querySelector(".close");
     this._close.addEventListener("click", () => this._dialog.close());
@@ -98,8 +103,12 @@ export class EntityPopupCard extends HTMLElement {
     this._revision++;
     if (this._dialog.open) this._dialog.close();
     this._clearOperations();
+    this._actionPending.clear();
+    this._actionButtons = [];
+    this._actionGrid.replaceChildren();
     this._card?.remove();
     this._card = null;
+    this._summaryParts = null;
     this._tile.textContent = "";
     if (this.isConnected) this._buildCard();
   }
@@ -114,7 +123,8 @@ export class EntityPopupCard extends HTMLElement {
   }
   set hass(hass) {
     this._hass = hass;
-    if (this._card && this.isConnected) this._card.hass = hass;
+    if (this._card && this.isConnected && !this._config?.summary_tile) this._card.hass = hass;
+    this._renderSummaryTile();
     if (this._dialog.open) this._renderDialog();
   }
   set layout(layout) {
@@ -131,7 +141,12 @@ export class EntityPopupCard extends HTMLElement {
   async _buildCard() {
     if (!this._config || !this.isConnected) return;
     if (this._card) {
-      this._card.hass = this._hass;
+      if (!this._config.summary_tile) this._card.hass = this._hass;
+      this._renderSummaryTile();
+      return;
+    }
+    if (this._config.summary_tile) {
+      this._buildSummaryTile();
       return;
     }
     const revision = ++this._revision;
@@ -154,6 +169,64 @@ export class EntityPopupCard extends HTMLElement {
       this._tile.textContent = "Details unavailable";
       console.error("Unable to load entity popup card", error);
     }
+  }
+
+  _buildSummaryTile() {
+    const card = document.createElement("ha-card");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "summary-tile";
+    const iconBox = document.createElement("span");
+    iconBox.className = "summary-icon";
+    const icon = document.createElement("ha-icon");
+    icon.setAttribute("aria-hidden", "true");
+    iconBox.append(icon);
+    const copy = document.createElement("span");
+    copy.className = "summary-copy";
+    const name = document.createElement("span");
+    name.className = "summary-name";
+    const state = document.createElement("span");
+    state.className = "summary-state";
+    copy.append(name, state);
+    button.append(iconBox, copy);
+    button.addEventListener("click", () => this._openDialog());
+    card.append(button);
+    this._card = card;
+    this._summaryParts = { button, icon, name, state };
+    this._tile.replaceChildren(card);
+    this._renderSummaryTile();
+  }
+
+  _sectionSummary(snapshot, section) {
+    if (
+      section.source !== "members" &&
+      !(section.source === "entities" && section.mode === "controls")
+    )
+      return "";
+    if (!snapshot.membershipKnown) return "Items unavailable";
+    const count = snapshot.activeCount;
+    const noun = count === 1 ? section.singular || "item" : section.plural || "items";
+    const control =
+      section.mode === "controls" && section.domain ? CONTROL_TYPES.get(section.domain) : null;
+    const unavailable = snapshot.allItems.filter((item) =>
+      ["unknown", "unavailable"].includes(item.state),
+    ).length;
+    return `${count} ${noun} ${section.active_label || control?.activeLabel || "active"}${unavailable ? ` · ${unavailable} unavailable` : ""}${snapshot.sourceAvailable ? "" : " · Source unavailable"}`;
+  }
+
+  _renderSummaryTile() {
+    if (!this._summaryParts || !this._config?.summary_tile) return;
+    const { button, icon, name, state } = this._summaryParts;
+    const section = this._config.popup.sections[0];
+    const snapshot = collectSection(this._hass?.states, this._config.entity, section);
+    name.textContent = this._config.summary_tile.name;
+    state.textContent = this._sectionSummary(snapshot, section) || `${snapshot.items.length} items`;
+    icon.icon =
+      this._config.summary_tile.icon ||
+      this._hass?.states?.[this._config.entity]?.attributes?.icon ||
+      "mdi:format-list-bulleted";
+    button.dataset.active = String(snapshot.activeCount > 0);
+    button.setAttribute("aria-label", `${name.textContent}, ${state.textContent}`);
   }
 
   _openDialog() {
@@ -183,8 +256,17 @@ export class EntityPopupCard extends HTMLElement {
     empty.className = "empty";
     const missing = document.createElement("p");
     missing.className = "unavailable";
-    node.append(heading, list, empty, missing);
-    const parts = { list, empty, missing };
+    const footer = document.createElement("div");
+    footer.className = "section-footer";
+    footer.hidden = !section.bulk_label;
+    const bulk = document.createElement("button");
+    bulk.type = "button";
+    bulk.className = "bulk-button";
+    bulk.textContent = section.bulk_label || "";
+    bulk.addEventListener("click", () => this._bulkChange(index));
+    footer.append(bulk);
+    node.append(heading, list, empty, missing, footer);
+    const parts = { list, empty, missing, bulk };
     this._sectionNodes.set(index, parts);
     this._sections.append(node);
     return parts;
@@ -236,7 +318,7 @@ export class EntityPopupCard extends HTMLElement {
       }
     }
     for (const [key, error] of this._errors)
-      if (error.confirmedStates.includes(this._hass?.states?.[error.entity]?.state))
+      if (error.confirmedStates?.includes(this._hass?.states?.[error.entity]?.state))
         this._errors.delete(key);
     this._title.textContent =
       config.title || this._config.dialog_title || source?.attributes?.friendly_name || "Details";
@@ -257,18 +339,7 @@ export class EntityPopupCard extends HTMLElement {
     } else if (config.status_text) {
       this._status.textContent = config.status_text;
     } else {
-      const first = snapshots[0];
-      const section = config.sections[0];
-      const count = first.activeCount;
-      const noun = count === 1 ? section.singular || "item" : section.plural || "items";
-      const control =
-        section.mode === "controls" && section.domain ? CONTROL_TYPES.get(section.domain) : null;
-      this._status.textContent =
-        section.source !== "members"
-          ? ""
-          : !first.membershipKnown
-            ? "Items unavailable"
-            : `${count} ${noun} ${section.active_label || control?.activeLabel || "active"}${first.sourceAvailable ? "" : " · Source unavailable"}`;
+      this._status.textContent = this._sectionSummary(snapshots[0], config.sections[0]);
     }
     this._status.hidden = !this._status.textContent;
     if (this._status.hidden) this._dialog.removeAttribute("aria-describedby");
@@ -277,7 +348,7 @@ export class EntityPopupCard extends HTMLElement {
     const keepRows = new Set();
     for (const [index, section] of config.sections.entries()) {
       const snapshot = snapshots[index];
-      const { list, empty, missing } = this._sectionNode(index, section);
+      const { list, empty, missing, bulk } = this._sectionNode(index, section);
       const current = new Map(
         snapshot.allItems.filter((item) => item.entity).map((item) => [item.entity, item]),
       );
@@ -391,7 +462,11 @@ export class EntityPopupCard extends HTMLElement {
           }
           parts.control.setAttribute("aria-busy", String(busy));
           parts.control.disabled =
-            !action || busy || !snapshot.membershipKnown || !snapshot.memberIds.has(item.entity);
+            !action ||
+            busy ||
+            this._actionPending.size > 0 ||
+            !snapshot.membershipKnown ||
+            !snapshot.memberIds.has(item.entity);
           parts.control.title = busy ? "Updating…" : action?.label || "Unavailable";
           if (parts.rowButton)
             parts.rowButton.setAttribute("aria-label", `${item.name}. More information`);
@@ -410,16 +485,109 @@ export class EntityPopupCard extends HTMLElement {
       missing.textContent = unavailable.length
         ? `Unavailable: ${unavailable.map((item) => item.name).join(", ")}`
         : "";
+      if (section.bulk_label) {
+        const actionable = snapshot.allItems.some((item) => {
+          const control = controlFor(item.entity);
+          return control && isActive(control, item.state) && actionFor(control, item.state);
+        });
+        bulk.disabled =
+          !snapshot.membershipKnown ||
+          !actionable ||
+          this._operations.size > 0 ||
+          this._actionPending.size > 0;
+      }
     }
     for (const [key, parts] of this._rows)
       if (!keepRows.has(key)) {
         parts.row.remove();
         this._rows.delete(key);
       }
+    this._renderActions();
     this._error.hidden = this._errors.size === 0;
     this._error.textContent = [...this._errors.values()]
       .map((error) => `${error.name}: ${error.message}`)
       .join("\n");
+  }
+
+  _renderActions() {
+    const actions = this._config.popup.actions || [];
+    this._actions.hidden = !actions.length;
+    if (!actions.length) return;
+    this._actionsTitle.textContent = this._config.popup.actions_title || "Actions";
+    for (const [index, action] of actions.entries()) {
+      let parts = this._actionButtons[index];
+      if (!parts) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "action-button";
+        const icon = document.createElement("ha-icon");
+        icon.setAttribute("aria-hidden", "true");
+        const name = document.createElement("span");
+        button.append(icon, name);
+        button.addEventListener("click", () => this._runAction(index));
+        this._actionGrid.append(button);
+        parts = { button, icon, name };
+        this._actionButtons[index] = parts;
+      }
+      const record = this._hass?.states?.[action.entity];
+      const available = !!record && !["unknown", "unavailable"].includes(record.state);
+      parts.name.textContent = action.name || record?.attributes?.friendly_name || action.entity;
+      parts.icon.icon = action.icon || record?.attributes?.icon || "mdi:play";
+      parts.button.disabled =
+        !available || this._actionPending.size > 0 || this._operations.size > 0;
+      parts.button.setAttribute(
+        "aria-label",
+        available ? parts.name.textContent : `${parts.name.textContent} unavailable`,
+      );
+      parts.button.setAttribute("aria-busy", String(this._actionPending.has(index)));
+    }
+  }
+
+  async _runAction(index) {
+    const action = this._config.popup.actions?.[index];
+    const state = this._hass?.states?.[action?.entity]?.state;
+    if (
+      !this.isConnected ||
+      !this._dialog.open ||
+      !action ||
+      !state ||
+      ["unknown", "unavailable"].includes(state) ||
+      this._actionPending.size ||
+      this._operations.size ||
+      typeof this._hass?.callService !== "function"
+    )
+      return;
+    const pending = {};
+    this._actionPending.set(index, pending);
+    this._errors.delete(`action:${index}`);
+    this._renderDialog();
+    try {
+      const [domain, service] = action.service.split(".");
+      await this._hass.callService(domain, service, { entity_id: action.entity });
+    } catch (_) {
+      if (this._actionPending.get(index) === pending)
+        this._errors.set(`action:${index}`, {
+          name: action.name || action.entity,
+          message: "Couldn't run the action. Try again.",
+        });
+    } finally {
+      if (this._actionPending.get(index) === pending) this._actionPending.delete(index);
+      if (this._dialog.open) this._renderDialog();
+    }
+  }
+
+  async _bulkChange(index) {
+    const section = this._config.popup.sections[index];
+    if (!section?.bulk_label || this._operations.size || this._actionPending.size) return;
+    const snapshot = collectSection(this._hass?.states, this._config.entity, section);
+    if (!snapshot.membershipKnown) return;
+    const entities = snapshot.allItems
+      .filter((item) => {
+        const control = controlFor(item.entity);
+        return control && isActive(control, item.state) && actionFor(control, item.state);
+      })
+      .map((item) => item.entity);
+    await Promise.all(entities.map((entity) => this._change(index, entity)));
   }
 
   _moreInfo(entityId) {
@@ -437,7 +605,8 @@ export class EntityPopupCard extends HTMLElement {
       !this.isConnected ||
       !this._dialog.open ||
       section.mode !== "controls" ||
-      this._operations.has(key)
+      this._operations.has(key) ||
+      this._actionPending.size > 0
     )
       return;
     const snapshot = collectSection(this._hass?.states, this._config.entity, {

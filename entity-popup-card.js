@@ -84,14 +84,14 @@
     if (Array.isArray(value)) return value.filter((id) => typeof id === "string" && ENTITY.test(id));
     return null;
   }
-  function entityItem(states, id, section, name) {
+  function entityItem(states, id, section, name, icon) {
     const record = states?.[id];
     return {
       key: id,
       entity: id,
       name: name || record?.attributes?.friendly_name || id,
       state: record?.state ?? "unavailable",
-      icon: record?.attributes?.icon || section.icon,
+      icon: icon || record?.attributes?.icon || section.icon,
       attributes: record?.attributes || {},
       last_changed: record?.last_changed
     };
@@ -145,7 +145,15 @@
     } else if (section.source === "entities") {
       for (const entry of section.entities) {
         const id = typeof entry === "string" ? entry : entry.entity;
-        add(entityItem(states, id, section, typeof entry === "object" ? entry.name : void 0));
+        add(
+          entityItem(
+            states,
+            id,
+            section,
+            typeof entry === "object" ? entry.name : void 0,
+            typeof entry === "object" ? entry.icon : void 0
+          )
+        );
       }
     } else if (section.source === "match") {
       for (const id of Object.keys(states || {})) {
@@ -205,6 +213,7 @@
   var isEntity = (value) => typeof value === "string" && ENTITY.test(value);
   var isPath = (value) => typeof value === "string" && PATH.test(value);
   var entryEntity = (entry) => typeof entry === "string" ? entry : entry?.entity;
+  var isService = (value) => typeof value === "string" && /^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$/.test(value);
   function validateSection(section) {
     if (!section || !SOURCES.has(section.source)) {
       throw new Error("Choose a popup section source: members, entities, match, values, or records.");
@@ -217,6 +226,9 @@
     }
     if (section.row_action && !["more-info", "none"].includes(section.row_action)) {
       throw new Error("Row action must be more-info or none.");
+    }
+    if (section.bulk_label !== void 0 && (section.mode !== "controls" || typeof section.bulk_label !== "string" || !section.bulk_label.trim())) {
+      throw new Error("A bulk label needs a control section and non-empty text.");
     }
     if (section.source === "members" && !isPath(section.attribute || "entity_id")) {
       throw new Error("Invalid member attribute.");
@@ -258,6 +270,9 @@
     if (config.card && (typeof config.card !== "object" || Array.isArray(config.card) || typeof config.card.type !== "string" || !config.card.type)) {
       throw new Error("The card option needs a Lovelace card type.");
     }
+    if (config.summary_tile && (config.card || typeof config.summary_tile !== "object" || Array.isArray(config.summary_tile) || typeof config.summary_tile.name !== "string" || !config.summary_tile.name.trim() || config.summary_tile.icon !== void 0 && typeof config.summary_tile.icon !== "string")) {
+      throw new Error("A summary tile needs a name and optional icon, without a card option.");
+    }
     if (config.popup.status_attribute && !isPath(config.popup.status_attribute)) {
       throw new Error("Invalid popup status attribute.");
     }
@@ -267,11 +282,16 @@
     if (config.popup.width !== void 0 && (!Number.isInteger(config.popup.width) || config.popup.width < 320 || config.popup.width > 960)) {
       throw new Error("Popup width must be a whole number from 320 to 960 pixels.");
     }
+    if (config.popup.actions !== void 0 && (!Array.isArray(config.popup.actions) || config.popup.actions.some(
+      (action) => !action || !isEntity(action.entity) || !isService(action.service) || action.name !== void 0 && (typeof action.name !== "string" || !action.name.trim()) || action.icon !== void 0 && typeof action.icon !== "string"
+    ))) {
+      throw new Error("Popup actions need an entity, a domain.service, and optional name and icon.");
+    }
     config.popup.sections.forEach(validateSection);
   }
 
   // src/styles.css
-  var styles_default = ':host {\n  display: block;\n  min-width: 0;\n  height: 100%;\n  font-family: var(--ha-font-family-body, inherit);\n}\n.tile,\n.tile > * {\n  display: block;\n  height: 100%;\n  min-width: 0;\n}\n:host([compact]) {\n  height: auto;\n}\n:host([compact]) .tile,\n:host([compact]) .tile > * {\n  height: auto;\n}\n:host([badge]) {\n  display: inline-block;\n  height: auto;\n}\n:host([badge]) .tile,\n:host([badge]) .tile > * {\n  height: auto;\n}\ndialog {\n  box-sizing: border-box;\n  width: min(var(--entity-popup-width, 480px), calc(100vw - 24px));\n  max-height: min(80dvh, 720px);\n  padding: 0;\n  border: 1px solid var(--divider-color, #555);\n  border-radius: var(--ha-border-radius-3xl, 24px);\n  color: var(--primary-text-color, #212121);\n  background: var(\n    --ha-color-surface-default,\n    var(--ha-card-background, var(--card-background-color, #fff))\n  );\n  box-shadow: var(--ha-box-shadow-l, 0 12px 40px #0006);\n  overflow: auto;\n}\ndialog::backdrop {\n  background: #0007;\n}\n.header {\n  position: sticky;\n  top: 0;\n  z-index: 1;\n  display: flex;\n  align-items: center;\n  gap: var(--ha-space-3, 12px);\n  padding-block: var(--ha-space-3, 12px);\n  padding-inline: var(--ha-space-3, 12px) var(--ha-space-5, 20px);\n  background: inherit;\n}\nh2 {\n  margin: 0;\n  flex: 1;\n  min-width: 0;\n  font-size: var(--ha-font-size-xl, 20px);\n  line-height: 28px;\n  font-weight: var(--ha-font-weight-medium, 600);\n}\n.close {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 44px;\n  height: 44px;\n  border: 0;\n  border-radius: 50%;\n  background: transparent;\n  color: var(--primary-text-color);\n  cursor: pointer;\n}\n.close:hover,\n.row-button:hover,\n.switch:hover,\n.cover-action:hover {\n  background: var(--secondary-background-color, #8882);\n}\nbutton:focus-visible {\n  outline: 2px solid var(--primary-color);\n  outline-offset: 1px;\n}\n.body {\n  padding-block: var(--ha-space-4, 16px) var(--ha-space-6, 24px);\n  padding-inline: var(--ha-space-6, 24px);\n}\n.status,\n.empty,\n.unavailable {\n  margin: 0;\n  font-size: 14px;\n  line-height: 21px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.status {\n  margin-block-end: var(--ha-space-3, 12px);\n}\n.section + .section {\n  margin-block-start: var(--ha-space-5, 20px);\n}\nh3 {\n  margin: 12px 0 4px;\n  font-size: var(--ha-font-size-m, 14px);\n  line-height: 20px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  color: var(--secondary-text-color);\n}\nul {\n  list-style: none;\n  margin: 4px 0 0;\n  padding: 0;\n}\nli {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 56px;\n  padding: 4px 0;\n}\nli + li {\n  border-top: 1px solid var(--divider-color, #8883);\n}\nli ha-icon {\n  flex: none;\n  --mdc-icon-size: 22px;\n  color: var(--primary-color);\n}\n.copy {\n  flex: 1;\n  min-width: 0;\n}\n.name {\n  display: block;\n  font-size: var(--ha-font-size-m, 15px);\n  line-height: 22px;\n  overflow-wrap: anywhere;\n}\n.detail {\n  display: block;\n  font-size: var(--ha-font-size-s, 12px);\n  line-height: 18px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.row-button {\n  flex: 1;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 48px;\n  padding: 0;\n  border: 0;\n  border-radius: 6px;\n  background: transparent;\n  color: inherit;\n  font: inherit;\n  text-align: left;\n  cursor: pointer;\n}\n.row-button:only-child {\n  margin-inline: calc(-1 * var(--ha-space-3, 12px));\n  padding-inline: var(--ha-space-3, 12px);\n}\n.row-button ha-icon:last-child {\n  color: var(--secondary-text-color);\n  --mdc-icon-size: 18px;\n}\n.switch {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 48px;\n  height: 44px;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  cursor: pointer;\n}\n.switch:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.switch[aria-busy="true"] {\n  cursor: wait;\n}\n.track {\n  display: block;\n  box-sizing: border-box;\n  width: 36px;\n  height: 22px;\n  padding: 3px;\n  border-radius: 12px;\n  background: var(--disabled-color, #777);\n  transition: background 120ms;\n}\n.thumb {\n  display: block;\n  width: 16px;\n  height: 16px;\n  margin-inline-start: 0;\n  border-radius: 50%;\n  background: var(--card-background-color, #fff);\n  transition: margin-inline-start 120ms;\n}\n.switch[aria-checked="true"] .track {\n  background: var(--state-light-active-color, var(--primary-color, #03a9f4));\n}\n.switch[aria-checked="true"] .thumb {\n  margin-inline-start: 14px;\n}\n.cover-action {\n  flex: none;\n  min-width: 64px;\n  min-height: 36px;\n  padding: 0 12px;\n  border: 1px solid var(--divider-color, #8883);\n  border-radius: 18px;\n  background: transparent;\n  color: var(--primary-color);\n  font: inherit;\n  font-size: 14px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  cursor: pointer;\n}\n.cover-action:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.empty {\n  padding: 12px 0 4px;\n}\n.unavailable {\n  padding-top: 8px;\n}\n.error {\n  margin: 12px 0 0;\n  color: var(--error-color, #db4437);\n  font-size: 13px;\n  line-height: 20px;\n  white-space: pre-line;\n  overflow-wrap: anywhere;\n}\nli[data-active="false"] > ha-icon,\nli[data-active="false"] .row-button > ha-icon:first-child {\n  color: var(--secondary-text-color);\n}\nli[data-active="true"] > ha-icon,\nli[data-active="true"] .row-button > ha-icon:first-child {\n  color: var(--state-light-active-color, var(--primary-color));\n}\n[hidden] {\n  display: none !important;\n}\n@media (max-width: 870px), (max-height: 500px) {\n  dialog {\n    inset: auto 0 0;\n    width: 100%;\n    max-width: none;\n    max-height: calc(100dvh - max(var(--safe-area-inset-top, 0px), 48px));\n    margin: 0;\n    border-radius: var(--ha-border-radius-3xl, 24px) var(--ha-border-radius-3xl, 24px) 0 0;\n    border-inline: 0;\n    border-bottom: 0;\n  }\n  .body {\n    padding-bottom: calc(var(--ha-space-6, 24px) + var(--safe-area-inset-bottom, 0px));\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .track,\n  .thumb {\n    transition: none;\n  }\n}\n';
+  var styles_default = ':host {\n  display: block;\n  min-width: 0;\n  height: 100%;\n  font-family: var(--ha-font-family-body, inherit);\n}\n.tile,\n.tile > * {\n  display: block;\n  height: 100%;\n  min-width: 0;\n}\n:host([compact]) {\n  height: auto;\n}\n:host([compact]) .tile,\n:host([compact]) .tile > * {\n  height: auto;\n}\n:host([badge]) {\n  display: inline-block;\n  height: auto;\n}\n:host([badge]) .tile,\n:host([badge]) .tile > * {\n  height: auto;\n}\n.summary-tile {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  width: 100%;\n  min-height: 56px;\n  padding: 8px 10px;\n  border: 0;\n  border-radius: inherit;\n  background: transparent;\n  color: var(--primary-text-color);\n  font: inherit;\n  text-align: left;\n  cursor: pointer;\n}\n.summary-icon {\n  display: grid;\n  place-items: center;\n  flex: none;\n  width: 36px;\n  height: 36px;\n  border-radius: 50%;\n  background: var(--secondary-background-color, #333);\n}\n.summary-icon ha-icon {\n  --mdc-icon-size: 20px;\n  color: var(--secondary-text-color);\n}\n.summary-tile[data-active="true"] .summary-icon ha-icon {\n  color: var(--state-light-active-color, var(--primary-color));\n}\n.summary-copy {\n  min-width: 0;\n}\n.summary-name,\n.summary-state {\n  display: block;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.summary-name {\n  font-weight: var(--ha-font-weight-medium, 600);\n}\n.summary-state {\n  margin-top: 2px;\n  color: var(--secondary-text-color);\n  font-size: 13px;\n}\ndialog {\n  box-sizing: border-box;\n  width: min(var(--entity-popup-width, 480px), calc(100vw - 24px));\n  max-height: min(80dvh, 720px);\n  padding: 0;\n  border: 1px solid var(--divider-color, #555);\n  border-radius: var(--ha-border-radius-3xl, 24px);\n  color: var(--primary-text-color, #212121);\n  background: var(\n    --ha-color-surface-default,\n    var(--ha-card-background, var(--card-background-color, #fff))\n  );\n  box-shadow: var(--ha-box-shadow-l, 0 12px 40px #0006);\n  overflow: auto;\n}\ndialog::backdrop {\n  background: #0007;\n}\n.header {\n  position: sticky;\n  top: 0;\n  z-index: 1;\n  display: flex;\n  align-items: center;\n  gap: var(--ha-space-3, 12px);\n  padding-block: var(--ha-space-3, 12px);\n  padding-inline: var(--ha-space-3, 12px) var(--ha-space-5, 20px);\n  background: inherit;\n}\nh2 {\n  margin: 0;\n  flex: 1;\n  min-width: 0;\n  font-size: var(--ha-font-size-xl, 20px);\n  line-height: 28px;\n  font-weight: var(--ha-font-weight-medium, 600);\n}\n.close {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 44px;\n  height: 44px;\n  border: 0;\n  border-radius: 50%;\n  background: transparent;\n  color: var(--primary-text-color);\n  cursor: pointer;\n}\n.close:hover,\n.row-button:hover,\n.switch:hover,\n.cover-action:hover {\n  background: var(--secondary-background-color, #8882);\n}\nbutton:focus-visible {\n  outline: 2px solid var(--primary-color);\n  outline-offset: 1px;\n}\n.body {\n  padding-block: var(--ha-space-4, 16px) var(--ha-space-6, 24px);\n  padding-inline: var(--ha-space-6, 24px);\n}\n.status,\n.empty,\n.unavailable {\n  margin: 0;\n  font-size: 14px;\n  line-height: 21px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.status {\n  margin-block-end: var(--ha-space-3, 12px);\n}\n.section + .section {\n  margin-block-start: var(--ha-space-5, 20px);\n}\nh3 {\n  margin: 12px 0 4px;\n  font-size: var(--ha-font-size-m, 14px);\n  line-height: 20px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  color: var(--secondary-text-color);\n}\nul {\n  list-style: none;\n  margin: 4px 0 0;\n  padding: 0;\n}\nli {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 56px;\n  padding: 4px 0;\n}\nli + li {\n  border-top: 1px solid var(--divider-color, #8883);\n}\nli ha-icon {\n  flex: none;\n  --mdc-icon-size: 22px;\n  color: var(--primary-color);\n}\n.copy {\n  flex: 1;\n  min-width: 0;\n}\n.name {\n  display: block;\n  font-size: var(--ha-font-size-m, 15px);\n  line-height: 22px;\n  overflow-wrap: anywhere;\n}\n.detail {\n  display: block;\n  font-size: var(--ha-font-size-s, 12px);\n  line-height: 18px;\n  color: var(--secondary-text-color);\n  overflow-wrap: anywhere;\n}\n.row-button {\n  flex: 1;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  min-height: 48px;\n  padding: 0;\n  border: 0;\n  border-radius: 6px;\n  background: transparent;\n  color: inherit;\n  font: inherit;\n  text-align: left;\n  cursor: pointer;\n}\n.row-button:only-child {\n  margin-inline: calc(-1 * var(--ha-space-3, 12px));\n  padding-inline: var(--ha-space-3, 12px);\n}\n.row-button ha-icon:last-child {\n  color: var(--secondary-text-color);\n  --mdc-icon-size: 18px;\n}\n.switch {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 48px;\n  height: 44px;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  cursor: pointer;\n}\n.switch:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.switch[aria-busy="true"] {\n  cursor: wait;\n}\n.track {\n  display: block;\n  box-sizing: border-box;\n  width: 36px;\n  height: 22px;\n  padding: 3px;\n  border-radius: 12px;\n  background: var(--disabled-color, #777);\n  transition: background 120ms;\n}\n.thumb {\n  display: block;\n  width: 16px;\n  height: 16px;\n  margin-inline-start: 0;\n  border-radius: 50%;\n  background: var(--card-background-color, #fff);\n  transition: margin-inline-start 120ms;\n}\n.switch[aria-checked="true"] .track {\n  background: var(--state-light-active-color, var(--primary-color, #03a9f4));\n}\n.switch[aria-checked="true"] .thumb {\n  margin-inline-start: 14px;\n}\n.cover-action {\n  flex: none;\n  min-width: 64px;\n  min-height: 36px;\n  padding: 0 12px;\n  border: 1px solid var(--divider-color, #8883);\n  border-radius: 18px;\n  background: transparent;\n  color: var(--primary-color);\n  font: inherit;\n  font-size: 14px;\n  font-weight: var(--ha-font-weight-medium, 600);\n  cursor: pointer;\n}\n.cover-action:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.section-footer {\n  display: flex;\n  justify-content: flex-end;\n  margin-top: 12px;\n}\n.bulk-button {\n  min-height: 44px;\n  padding: 0 16px;\n  border: 1px solid var(--divider-color, #8885);\n  border-radius: 22px;\n  background: transparent;\n  color: var(--primary-text-color);\n  font: inherit;\n  cursor: pointer;\n}\n.bulk-button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.actions {\n  margin-top: var(--ha-space-5, 20px);\n}\n.action-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));\n  gap: 10px;\n  margin-top: 10px;\n}\n.action-button {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  min-height: 52px;\n  padding: 8px 12px;\n  border: 1px solid var(--divider-color, #8885);\n  border-radius: 14px;\n  background: var(--secondary-background-color, #8882);\n  color: var(--primary-text-color);\n  font: inherit;\n  text-align: left;\n  cursor: pointer;\n}\n.action-button ha-icon {\n  flex: none;\n  --mdc-icon-size: 22px;\n  color: var(--primary-color);\n}\n.action-button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n.empty {\n  padding: 12px 0 4px;\n}\n.unavailable {\n  padding-top: 8px;\n}\n.error {\n  margin: 12px 0 0;\n  color: var(--error-color, #db4437);\n  font-size: 13px;\n  line-height: 20px;\n  white-space: pre-line;\n  overflow-wrap: anywhere;\n}\nli[data-active="false"] > ha-icon,\nli[data-active="false"] .row-button > ha-icon:first-child {\n  color: var(--secondary-text-color);\n}\nli[data-active="true"] > ha-icon,\nli[data-active="true"] .row-button > ha-icon:first-child {\n  color: var(--state-light-active-color, var(--primary-color));\n}\n[hidden] {\n  display: none !important;\n}\n@media (max-width: 870px), (max-height: 500px) {\n  dialog {\n    inset: auto 0 0;\n    width: 100%;\n    max-width: none;\n    max-height: calc(100dvh - max(var(--safe-area-inset-top, 0px), 48px));\n    margin: 0;\n    border-radius: var(--ha-border-radius-3xl, 24px) var(--ha-border-radius-3xl, 24px) 0 0;\n    border-inline: 0;\n    border-bottom: 0;\n  }\n  .body {\n    padding-bottom: calc(var(--ha-space-6, 24px) + var(--safe-area-inset-bottom, 0px));\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .track,\n  .thumb {\n    transition: none;\n  }\n}\n';
 
   // src/card.js
   var STATE_UPDATE_TIMEOUT_MS = 15e3;
@@ -297,18 +317,23 @@
       this._retained = /* @__PURE__ */ new Map();
       this._operations = /* @__PURE__ */ new Map();
       this._errors = /* @__PURE__ */ new Map();
+      this._actionPending = /* @__PURE__ */ new Map();
+      this._actionButtons = [];
       this.shadowRoot.innerHTML = `
       <style>${styles_default}</style>
       <div class="tile"></div>
       <dialog aria-labelledby="entity-popup-title" aria-describedby="entity-popup-status">
         <div class="header"><button class="close" type="button" aria-label="Close"><ha-icon icon="mdi:close" aria-hidden="true"></ha-icon></button><h2 id="entity-popup-title"></h2></div>
-        <div class="body"><p class="status" id="entity-popup-status"></p><div class="sections"></div><p class="error" role="alert" hidden></p></div>
+        <div class="body"><p class="status" id="entity-popup-status"></p><div class="sections"></div><div class="actions" hidden><h3></h3><div class="action-grid"></div></div><p class="error" role="alert" hidden></p></div>
       </dialog>`;
       this._tile = this.shadowRoot.querySelector(".tile");
       this._dialog = this.shadowRoot.querySelector("dialog");
       this._title = this.shadowRoot.querySelector("h2");
       this._status = this.shadowRoot.querySelector(".status");
       this._sections = this.shadowRoot.querySelector(".sections");
+      this._actions = this.shadowRoot.querySelector(".actions");
+      this._actionsTitle = this.shadowRoot.querySelector(".actions h3");
+      this._actionGrid = this.shadowRoot.querySelector(".action-grid");
       this._error = this.shadowRoot.querySelector(".error");
       this._close = this.shadowRoot.querySelector(".close");
       this._close.addEventListener("click", () => this._dialog.close());
@@ -356,8 +381,12 @@
       this._revision++;
       if (this._dialog.open) this._dialog.close();
       this._clearOperations();
+      this._actionPending.clear();
+      this._actionButtons = [];
+      this._actionGrid.replaceChildren();
       this._card?.remove();
       this._card = null;
+      this._summaryParts = null;
       this._tile.textContent = "";
       if (this.isConnected) this._buildCard();
     }
@@ -371,7 +400,8 @@
     }
     set hass(hass) {
       this._hass = hass;
-      if (this._card && this.isConnected) this._card.hass = hass;
+      if (this._card && this.isConnected && !this._config?.summary_tile) this._card.hass = hass;
+      this._renderSummaryTile();
       if (this._dialog.open) this._renderDialog();
     }
     set layout(layout) {
@@ -387,7 +417,12 @@
     async _buildCard() {
       if (!this._config || !this.isConnected) return;
       if (this._card) {
-        this._card.hass = this._hass;
+        if (!this._config.summary_tile) this._card.hass = this._hass;
+        this._renderSummaryTile();
+        return;
+      }
+      if (this._config.summary_tile) {
+        this._buildSummaryTile();
         return;
       }
       const revision = ++this._revision;
@@ -410,6 +445,54 @@
         this._tile.textContent = "Details unavailable";
         console.error("Unable to load entity popup card", error);
       }
+    }
+    _buildSummaryTile() {
+      const card = document.createElement("ha-card");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "summary-tile";
+      const iconBox = document.createElement("span");
+      iconBox.className = "summary-icon";
+      const icon = document.createElement("ha-icon");
+      icon.setAttribute("aria-hidden", "true");
+      iconBox.append(icon);
+      const copy = document.createElement("span");
+      copy.className = "summary-copy";
+      const name = document.createElement("span");
+      name.className = "summary-name";
+      const state = document.createElement("span");
+      state.className = "summary-state";
+      copy.append(name, state);
+      button.append(iconBox, copy);
+      button.addEventListener("click", () => this._openDialog());
+      card.append(button);
+      this._card = card;
+      this._summaryParts = { button, icon, name, state };
+      this._tile.replaceChildren(card);
+      this._renderSummaryTile();
+    }
+    _sectionSummary(snapshot, section) {
+      if (section.source !== "members" && !(section.source === "entities" && section.mode === "controls"))
+        return "";
+      if (!snapshot.membershipKnown) return "Items unavailable";
+      const count = snapshot.activeCount;
+      const noun = count === 1 ? section.singular || "item" : section.plural || "items";
+      const control = section.mode === "controls" && section.domain ? CONTROL_TYPES.get(section.domain) : null;
+      const unavailable = snapshot.allItems.filter(
+        (item) => ["unknown", "unavailable"].includes(item.state)
+      ).length;
+      return `${count} ${noun} ${section.active_label || control?.activeLabel || "active"}${unavailable ? ` \xB7 ${unavailable} unavailable` : ""}${snapshot.sourceAvailable ? "" : " \xB7 Source unavailable"}`;
+    }
+    _renderSummaryTile() {
+      if (!this._summaryParts || !this._config?.summary_tile) return;
+      const { button, icon, name, state } = this._summaryParts;
+      const section = this._config.popup.sections[0];
+      const snapshot = collectSection(this._hass?.states, this._config.entity, section);
+      name.textContent = this._config.summary_tile.name;
+      state.textContent = this._sectionSummary(snapshot, section) || `${snapshot.items.length} items`;
+      icon.icon = this._config.summary_tile.icon || this._hass?.states?.[this._config.entity]?.attributes?.icon || "mdi:format-list-bulleted";
+      button.dataset.active = String(snapshot.activeCount > 0);
+      button.setAttribute("aria-label", `${name.textContent}, ${state.textContent}`);
     }
     _openDialog() {
       if (!this.isConnected || this._dialog.open) return;
@@ -436,8 +519,17 @@
       empty.className = "empty";
       const missing = document.createElement("p");
       missing.className = "unavailable";
-      node.append(heading, list, empty, missing);
-      const parts = { list, empty, missing };
+      const footer = document.createElement("div");
+      footer.className = "section-footer";
+      footer.hidden = !section.bulk_label;
+      const bulk = document.createElement("button");
+      bulk.type = "button";
+      bulk.className = "bulk-button";
+      bulk.textContent = section.bulk_label || "";
+      bulk.addEventListener("click", () => this._bulkChange(index));
+      footer.append(bulk);
+      node.append(heading, list, empty, missing, footer);
+      const parts = { list, empty, missing, bulk };
       this._sectionNodes.set(index, parts);
       this._sections.append(node);
       return parts;
@@ -479,7 +571,7 @@
         }
       }
       for (const [key, error] of this._errors)
-        if (error.confirmedStates.includes(this._hass?.states?.[error.entity]?.state))
+        if (error.confirmedStates?.includes(this._hass?.states?.[error.entity]?.state))
           this._errors.delete(key);
       this._title.textContent = config.title || this._config.dialog_title || source?.attributes?.friendly_name || "Details";
       const snapshots = config.sections.map(
@@ -492,12 +584,7 @@
       } else if (config.status_text) {
         this._status.textContent = config.status_text;
       } else {
-        const first = snapshots[0];
-        const section = config.sections[0];
-        const count = first.activeCount;
-        const noun = count === 1 ? section.singular || "item" : section.plural || "items";
-        const control = section.mode === "controls" && section.domain ? CONTROL_TYPES.get(section.domain) : null;
-        this._status.textContent = section.source !== "members" ? "" : !first.membershipKnown ? "Items unavailable" : `${count} ${noun} ${section.active_label || control?.activeLabel || "active"}${first.sourceAvailable ? "" : " \xB7 Source unavailable"}`;
+        this._status.textContent = this._sectionSummary(snapshots[0], config.sections[0]);
       }
       this._status.hidden = !this._status.textContent;
       if (this._status.hidden) this._dialog.removeAttribute("aria-describedby");
@@ -505,7 +592,7 @@
       const keepRows = /* @__PURE__ */ new Set();
       for (const [index, section] of config.sections.entries()) {
         const snapshot = snapshots[index];
-        const { list, empty, missing } = this._sectionNode(index, section);
+        const { list, empty, missing, bulk } = this._sectionNode(index, section);
         const current = new Map(
           snapshot.allItems.filter((item) => item.entity).map((item) => [item.entity, item])
         );
@@ -608,7 +695,7 @@
               parts.control.setAttribute("aria-checked", String(itemActive));
             }
             parts.control.setAttribute("aria-busy", String(busy));
-            parts.control.disabled = !action || busy || !snapshot.membershipKnown || !snapshot.memberIds.has(item.entity);
+            parts.control.disabled = !action || busy || this._actionPending.size > 0 || !snapshot.membershipKnown || !snapshot.memberIds.has(item.entity);
             parts.control.title = busy ? "Updating\u2026" : action?.label || "Unavailable";
             if (parts.rowButton)
               parts.rowButton.setAttribute("aria-label", `${item.name}. More information`);
@@ -623,14 +710,88 @@
         const unavailable = snapshot.unavailable.filter((item) => !visibleKeys.has(item.key));
         missing.hidden = unavailable.length === 0;
         missing.textContent = unavailable.length ? `Unavailable: ${unavailable.map((item) => item.name).join(", ")}` : "";
+        if (section.bulk_label) {
+          const actionable = snapshot.allItems.some((item) => {
+            const control = controlFor(item.entity);
+            return control && isActive(control, item.state) && actionFor(control, item.state);
+          });
+          bulk.disabled = !snapshot.membershipKnown || !actionable || this._operations.size > 0 || this._actionPending.size > 0;
+        }
       }
       for (const [key, parts] of this._rows)
         if (!keepRows.has(key)) {
           parts.row.remove();
           this._rows.delete(key);
         }
+      this._renderActions();
       this._error.hidden = this._errors.size === 0;
       this._error.textContent = [...this._errors.values()].map((error) => `${error.name}: ${error.message}`).join("\n");
+    }
+    _renderActions() {
+      const actions = this._config.popup.actions || [];
+      this._actions.hidden = !actions.length;
+      if (!actions.length) return;
+      this._actionsTitle.textContent = this._config.popup.actions_title || "Actions";
+      for (const [index, action] of actions.entries()) {
+        let parts = this._actionButtons[index];
+        if (!parts) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "action-button";
+          const icon = document.createElement("ha-icon");
+          icon.setAttribute("aria-hidden", "true");
+          const name = document.createElement("span");
+          button.append(icon, name);
+          button.addEventListener("click", () => this._runAction(index));
+          this._actionGrid.append(button);
+          parts = { button, icon, name };
+          this._actionButtons[index] = parts;
+        }
+        const record = this._hass?.states?.[action.entity];
+        const available = !!record && !["unknown", "unavailable"].includes(record.state);
+        parts.name.textContent = action.name || record?.attributes?.friendly_name || action.entity;
+        parts.icon.icon = action.icon || record?.attributes?.icon || "mdi:play";
+        parts.button.disabled = !available || this._actionPending.size > 0 || this._operations.size > 0;
+        parts.button.setAttribute(
+          "aria-label",
+          available ? parts.name.textContent : `${parts.name.textContent} unavailable`
+        );
+        parts.button.setAttribute("aria-busy", String(this._actionPending.has(index)));
+      }
+    }
+    async _runAction(index) {
+      const action = this._config.popup.actions?.[index];
+      const state = this._hass?.states?.[action?.entity]?.state;
+      if (!this.isConnected || !this._dialog.open || !action || !state || ["unknown", "unavailable"].includes(state) || this._actionPending.size || this._operations.size || typeof this._hass?.callService !== "function")
+        return;
+      const pending = {};
+      this._actionPending.set(index, pending);
+      this._errors.delete(`action:${index}`);
+      this._renderDialog();
+      try {
+        const [domain, service] = action.service.split(".");
+        await this._hass.callService(domain, service, { entity_id: action.entity });
+      } catch (_) {
+        if (this._actionPending.get(index) === pending)
+          this._errors.set(`action:${index}`, {
+            name: action.name || action.entity,
+            message: "Couldn't run the action. Try again."
+          });
+      } finally {
+        if (this._actionPending.get(index) === pending) this._actionPending.delete(index);
+        if (this._dialog.open) this._renderDialog();
+      }
+    }
+    async _bulkChange(index) {
+      const section = this._config.popup.sections[index];
+      if (!section?.bulk_label || this._operations.size || this._actionPending.size) return;
+      const snapshot = collectSection(this._hass?.states, this._config.entity, section);
+      if (!snapshot.membershipKnown) return;
+      const entities = snapshot.allItems.filter((item) => {
+        const control = controlFor(item.entity);
+        return control && isActive(control, item.state) && actionFor(control, item.state);
+      }).map((item) => item.entity);
+      await Promise.all(entities.map((entity) => this._change(index, entity)));
     }
     _moreInfo(entityId) {
       if (!ENTITY.test(entityId || "")) return;
@@ -642,7 +803,7 @@
     async _change(index, entity) {
       const section = this._config.popup.sections[index];
       const key = `${index}:${entity}`;
-      if (!this.isConnected || !this._dialog.open || section.mode !== "controls" || this._operations.has(key))
+      if (!this.isConnected || !this._dialog.open || section.mode !== "controls" || this._operations.has(key) || this._actionPending.size > 0)
         return;
       const snapshot = collectSection(this._hass?.states, this._config.entity, {
         ...section,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Optional summary tiles show a popup section's live active count without a dashboard template.
+- Control sections can offer a single bulk off button without repeating their entity list.
+- Optional service buttons let a popup run configured entity actions, including scenes, without room-specific code.
+- Explicit entity icons work in fixed lists.
+- Record sections and compact badges share the same popup.
+
 ## 1.1.0
 
 - Wider clickable highlight for read-only rows, with the original text and control spacing preserved.

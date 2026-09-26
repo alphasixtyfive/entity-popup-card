@@ -2,7 +2,7 @@
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alphasixtyfive&repository=entity-popup-card&category=plugin)
 
-A small Home Assistant dashboard card that opens a live list of related entities. I use it for groups of lights and for a few sensor summaries. The popup keeps the quick actions close at hand; tapping a row can open Home Assistant's own more-info dialog when you want the full controls or history.
+A small Home Assistant dashboard card that opens a live list of related entities. It can show a room summary tile, quick controls, and optional service buttons in the same popup. Tapping a row can open Home Assistant's own more-info dialog for full controls or history.
 
 It works with the built-in Tile card. If you already use Mushroom template cards, you can keep those too.
 
@@ -74,6 +74,43 @@ popup:
 ```
 
 `members` reads the group's `entity_id` attribute. If your group uses another attribute, set `attribute:` in the section.
+
+## A room with optional actions
+
+`summary_tile` shows the active count from the first popup section without a separate group entity or dashboard template. The popup can also offer service buttons. Each button names its own entity and service, so the card has no built-in scene or room assumptions.
+
+```yaml
+type: custom:entity-popup-card
+entity: light.living_room_lamp
+summary_tile:
+  name: Living room
+  icon: mdi:lightbulb-multiple
+popup:
+  title: Living room lights
+  sections:
+    - source: entities
+      domain: light
+      mode: controls
+      show_state: true
+      row_action: more-info
+      bulk_label: Turn all off
+      singular: light
+      plural: lights
+      active_label: "on"
+      entities:
+        - entity: light.living_room_lamp
+          name: Lamp
+        - entity: light.living_room_ceiling
+          name: Ceiling
+  actions_title: Scenes
+  actions:
+    - entity: scene.movie_night
+      service: scene.turn_on
+      name: Movie night
+      icon: mdi:movie-open
+```
+
+`bulk_label` adds a button that applies each active control's normal off action, without repeating the entity list. Buttons are disabled when their entity is unavailable. A service button reports a failed call, but does not claim the resulting devices reached a particular state.
 
 ## A short sensor list
 
