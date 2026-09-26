@@ -82,12 +82,21 @@ function validateSection(section) {
 }
 
 export function validateConfig(config) {
+  const sections = config?.popup?.sections;
+  const rootOptional =
+    !!config?.summary_tile &&
+    Array.isArray(sections) &&
+    sections.every((section) => ["entities", "match"].includes(section?.source)) &&
+    !config.popup.status_attribute &&
+    !config.popup.status_attributes;
   if (
-    !isEntity(config?.entity) ||
-    !Array.isArray(config.popup?.sections) ||
-    !config.popup.sections.length
+    !Array.isArray(sections) ||
+    !sections.length ||
+    (config.entity !== undefined ? !isEntity(config.entity) : !rootOptional)
   ) {
-    throw new Error("Entity Popup Card needs an entity and at least one popup section.");
+    throw new Error(
+      "Entity Popup Card needs a popup section and an entity unless a summary tile uses an explicit list or match.",
+    );
   }
   if (
     config.card &&
@@ -133,11 +142,13 @@ export function validateConfig(config) {
           !action ||
           !isEntity(action.entity) ||
           !isService(action.service) ||
+          (action.data !== undefined &&
+            (!action.data || typeof action.data !== "object" || Array.isArray(action.data))) ||
           (action.name !== undefined && (typeof action.name !== "string" || !action.name.trim())) ||
           (action.icon !== undefined && typeof action.icon !== "string"),
       ))
   ) {
-    throw new Error("Popup actions need an entity, a domain.service, and optional name and icon.");
+    throw new Error("Popup actions need an entity, a domain.service, and optional name, icon, and data.");
   }
   config.popup.sections.forEach(validateSection);
 }

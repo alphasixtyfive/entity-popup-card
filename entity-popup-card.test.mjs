@@ -444,7 +444,6 @@ test("popup width is optional, bounded, and resets when removed", async () => {
 
 test("a generic room tile shows the first control count and offers configured actions", async () => {
   const config = {
-    entity: "light.lamp",
     summary_tile: { name: "Room", icon: "mdi:lightbulb-multiple" },
     popup: {
       title: "Room lights",
@@ -468,6 +467,7 @@ test("a generic room tile shows the first control count and offers configured ac
           service: "scene.turn_on",
           name: "Morning",
           icon: "mdi:weather-sunny",
+          data: { transition: 2, entity_id: "scene.other" },
         },
       ],
     },
@@ -488,7 +488,7 @@ test("a generic room tile shows the first control count and offers configured ac
   scene.dispatchEvent(new Event("click"));
   await flush();
   assert.deepEqual(servicesAsJson(env.services), [
-    ["scene", "turn_on", { entity_id: "scene.morning" }],
+    ["scene", "turn_on", { transition: 2, entity_id: "scene.morning" }],
   ]);
   states["scene.morning"].state = "unavailable";
   env.card.hass = env.card._hass;
@@ -541,6 +541,77 @@ test("generic popup actions require a valid entity and service", () => {
     () => validateConfig({ ...base, summary_tile: { name: "Room" }, card: { type: "tile" } }),
     /summary tile/,
   );
+  assert.throws(
+    () =>
+      validateConfig({
+        ...base,
+        popup: {
+          ...base.popup,
+          actions: [{ entity: "scene.morning", service: "scene.turn_on", data: [] }],
+        },
+      }),
+    /actions need/,
+  );
+  assert.throws(
+    () =>
+      validateConfig({
+        summary_tile: { name: "Group" },
+        popup: { sections: [{ source: "members" }] },
+      }),
+    /needs a popup section and an entity/,
+  );
+});
+
+test("bulk controls group matching services and settle even when states arrive first", async () => {
+  const config = {
+    summary_tile: { name: "Mixed controls" },
+    popup: {
+      sections: [
+        {
+          source: "entities",
+          mode: "controls",
+          bulk_label: "Turn all off",
+          entities: ["light.a", "light.b", "switch.c"],
+        },
+      ],
+    },
+  };
+  const states = {
+    "light.a": state("on", "A"),
+    "light.b": state("on", "B"),
+    "switch.c": state("on", "C"),
+  };
+  const env = environment(config, states);
+  env.card._summaryParts.button.dispatchEvent(new Event("click"));
+  env.card._sectionNodes.get(0).bulk.dispatchEvent(new Event("click"));
+  for (const record of Object.values(states)) record.state = "off";
+  env.card.hass = env.card._hass;
+  await flush();
+  assert.deepEqual(servicesAsJson(env.services), [
+    ["light", "turn_off", { entity_id: ["light.a", "light.b"] }],
+    ["switch", "turn_off", { entity_id: "switch.c" }],
+  ]);
+  assert.equal(env.card._operations.size, 0);
+  assert.equal(env.timers.size, 0);
+  assert.equal(env.card._error.hidden, true);
+});
+
+test("a finished control clears its timer after the popup closes", async () => {
+  const config = {
+    summary_tile: { name: "Lamp" },
+    popup: { sections: [{ source: "entities", mode: "controls", entities: ["light.lamp"] }] },
+  };
+  const states = { "light.lamp": state("on", "Lamp") };
+  const env = environment(config, states);
+  env.card._summaryParts.button.dispatchEvent(new Event("click"));
+  await env.card._change(0, "light.lamp");
+  assert.equal(env.card._operations.size, 1);
+  assert.equal(env.timers.size, 1);
+  env.card._dialog.close();
+  states["light.lamp"].state = "off";
+  env.card.hass = env.card._hass;
+  assert.equal(env.card._operations.size, 0);
+  assert.equal(env.timers.size, 0);
 });
 
 test("lights popup preserves tile icon action and has guarded, reversible controls", async () => {

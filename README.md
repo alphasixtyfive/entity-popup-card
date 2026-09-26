@@ -77,11 +77,10 @@ popup:
 
 ## A room with optional actions
 
-`summary_tile` shows the active count from the first popup section without a separate group entity or dashboard template. The popup can also offer service buttons. Each button names its own entity and service, so the card has no built-in scene or room assumptions.
+`summary_tile` shows the active count from the first popup section without a separate group entity or dashboard template. When the sections use explicit entities or a match, no root `entity` is needed. The popup can also offer service buttons. Each button names its own entity and service, so the card has no built-in scene or room assumptions.
 
 ```yaml
 type: custom:entity-popup-card
-entity: light.living_room_lamp
 summary_tile:
   name: Living room
   icon: mdi:lightbulb-multiple
@@ -108,9 +107,11 @@ popup:
       service: scene.turn_on
       name: Movie night
       icon: mdi:movie-open
+      data:
+        transition: 2
 ```
 
-`bulk_label` adds a button that applies each active control's normal off action, without repeating the entity list. Buttons are disabled when their entity is unavailable. A service button reports a failed call, but does not claim the resulting devices reached a particular state.
+`bulk_label` applies each active control's normal off action without repeating the entity list. Matching controls are sent in one Home Assistant service call. Buttons are disabled when their entity is unavailable. A service button reports a failed call, but does not claim the resulting devices reached a particular state.
 
 ## A short sensor list
 

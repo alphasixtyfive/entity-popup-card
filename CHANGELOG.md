@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+- Summary tiles built from explicit or matching entities no longer need an unrelated root entity.
+- Service buttons accept optional data for actions beyond simple scene activation.
+- Bulk controls group matching targets into one service call and settle cleanly when state updates arrive quickly or after the popup closes.
+
 ## 1.2.0
 
 - Optional summary tiles show a popup section's live active count without a dashboard template.

@@ -120,11 +120,13 @@ export class EntityPopupCard extends HTMLElement {
     this._revision++;
     if (this._dialog.open) this._dialog.close();
     this._clearOperations();
+    this._actionPending.clear();
   }
   set hass(hass) {
     this._hass = hass;
     if (this._card && this.isConnected && !this._config?.summary_tile) this._card.hass = hass;
     this._renderSummaryTile();
+    this._settleOperations();
     if (this._dialog.open) this._renderDialog();
   }
   set layout(layout) {
@@ -307,19 +309,6 @@ export class EntityPopupCard extends HTMLElement {
   _renderDialog() {
     const config = this._config.popup;
     const source = this._hass?.states?.[this._config.entity];
-    for (const [key, operation] of this._operations) {
-      const entity = key.slice(key.indexOf(":") + 1);
-      if (
-        operation.settled &&
-        operation.confirmedStates.includes(this._hass?.states?.[entity]?.state)
-      ) {
-        clearTimeout(operation.timer);
-        this._operations.delete(key);
-      }
-    }
-    for (const [key, error] of this._errors)
-      if (error.confirmedStates?.includes(this._hass?.states?.[error.entity]?.state))
-        this._errors.delete(key);
     this._title.textContent =
       config.title || this._config.dialog_title || source?.attributes?.friendly_name || "Details";
     const snapshots = config.sections.map((section) =>
@@ -563,7 +552,7 @@ export class EntityPopupCard extends HTMLElement {
     this._renderDialog();
     try {
       const [domain, service] = action.service.split(".");
-      await this._hass.callService(domain, service, { entity_id: action.entity });
+      await this._hass.callService(domain, service, { ...action.data, entity_id: action.entity });
     } catch (_) {
       if (this._actionPending.get(index) === pending)
         this._errors.set(`action:${index}`, {
@@ -578,16 +567,32 @@ export class EntityPopupCard extends HTMLElement {
 
   async _bulkChange(index) {
     const section = this._config.popup.sections[index];
-    if (!section?.bulk_label || this._operations.size || this._actionPending.size) return;
+    if (
+      !this.isConnected ||
+      !this._dialog.open ||
+      section?.mode !== "controls" ||
+      !section.bulk_label ||
+      this._operations.size ||
+      this._actionPending.size ||
+      typeof this._hass?.callService !== "function"
+    )
+      return;
     const snapshot = collectSection(this._hass?.states, this._config.entity, section);
     if (!snapshot.membershipKnown) return;
-    const entities = snapshot.allItems
-      .filter((item) => {
-        const control = controlFor(item.entity);
-        return control && isActive(control, item.state) && actionFor(control, item.state);
-      })
-      .map((item) => item.entity);
-    await Promise.all(entities.map((entity) => this._change(index, entity)));
+    const groups = new Map();
+    for (const item of snapshot.allItems) {
+      const control = controlFor(item.entity);
+      if (!control || !isActive(control, item.state)) continue;
+      const action = actionFor(control, item.state);
+      if (!action) continue;
+      const domain = item.entity.split(".")[0];
+      const groupKey = `${domain}.${action.service}`;
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups
+        .get(groupKey)
+        .push({ key: `${index}:${item.entity}`, entity: item.entity, domain, action });
+    }
+    await Promise.all([...groups.values()].map((changes) => this._sendControlGroup(changes)));
   }
 
   _moreInfo(entityId) {
@@ -618,25 +623,50 @@ export class EntityPopupCard extends HTMLElement {
     const control = controlFor(entity);
     const action = control && actionFor(control, state);
     if (!action || typeof this._hass?.callService !== "function") return;
-    const operation = { confirmedStates: action.confirmedStates, settled: false, timer: null };
-    this._operations.set(key, operation);
-    this._errors.delete(key);
+    await this._sendControlGroup([{ key, entity, domain: entity.split(".")[0], action }]);
+  }
+
+  async _sendControlGroup(changes) {
+    const pending = changes.map(({ key, entity, action }) => {
+      const operation = { confirmedStates: action.confirmedStates, settled: false, timer: null };
+      this._operations.set(key, operation);
+      this._errors.delete(key);
+      return { key, entity, operation };
+    });
     this._renderDialog();
     try {
-      await this._hass.callService(entity.split(".")[0], action.service, { entity_id: entity });
-      if (this._operations.get(key) !== operation) return;
-      operation.settled = true;
-      operation.timer = setTimeout(
-        () => this._finishOperation(key, operation, entity, "No update received. Try again."),
-        STATE_UPDATE_TIMEOUT_MS,
-      );
+      const { domain, action } = changes[0];
+      const entityIds = changes.map((change) => change.entity);
+      await this._hass.callService(domain, action.service, {
+        entity_id: entityIds.length === 1 ? entityIds[0] : entityIds,
+      });
+      for (const { key, entity, operation } of pending) {
+        if (this._operations.get(key) !== operation) continue;
+        if (operation.confirmedStates.includes(this._hass?.states?.[entity]?.state)) {
+          this._operations.delete(key);
+        } else {
+          operation.settled = true;
+          operation.timer = setTimeout(
+            () => this._finishOperation(key, operation, entity, "No update received. Try again."),
+            STATE_UPDATE_TIMEOUT_MS,
+          );
+        }
+      }
       if (this._dialog.open) this._renderDialog();
     } catch (_) {
-      this._finishOperation(key, operation, entity, "Couldn't change the item. Try again.");
+      for (const { key, entity, operation } of pending)
+        this._finishOperation(
+          key,
+          operation,
+          entity,
+          "Couldn't change the item. Try again.",
+          false,
+        );
+      if (this._dialog.open) this._renderDialog();
     }
   }
 
-  _finishOperation(key, operation, entity, message) {
+  _finishOperation(key, operation, entity, message, render = true) {
     if (this._operations.get(key) !== operation) return;
     clearTimeout(operation.timer);
     this._operations.delete(key);
@@ -647,7 +677,23 @@ export class EntityPopupCard extends HTMLElement {
         name: this._hass?.states?.[entity]?.attributes?.friendly_name || entity,
         message,
       });
-    if (this._dialog.open) this._renderDialog();
+    if (render && this._dialog.open) this._renderDialog();
+  }
+
+  _settleOperations() {
+    for (const [key, operation] of this._operations) {
+      const entity = key.slice(key.indexOf(":") + 1);
+      if (
+        operation.settled &&
+        operation.confirmedStates.includes(this._hass?.states?.[entity]?.state)
+      ) {
+        clearTimeout(operation.timer);
+        this._operations.delete(key);
+      }
+    }
+    for (const [key, error] of this._errors)
+      if (error.confirmedStates?.includes(this._hass?.states?.[error.entity]?.state))
+        this._errors.delete(key);
   }
 
   _clearOperations() {

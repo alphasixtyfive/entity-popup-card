@@ -1,12 +1,12 @@
 # Configuration
 
-`type: custom:entity-popup-card` needs an `entity` and at least one `popup.sections` entry. The card tap opens the popup. To choose the visible tile, use either `card:` with a Lovelace card configuration or top-level Mushroom template card fields.
+`type: custom:entity-popup-card` needs at least one `popup.sections` entry. An `entity` is needed when a section or status reads attributes from a root entity, or when a Lovelace or Mushroom card supplies the visible tile. A `summary_tile` with only `entities` or `match` sections can omit it. The card tap opens the popup.
 
 For a badge above a dashboard view, use `type: custom:entity-popup-badge` with the same `entity` and `popup` settings. Its visible trigger is a Mushroom template badge; set `label`, `content`, `icon`, and `color` at the top level. Mushroom must be installed for the badge.
 
 | Option                    | Purpose                                                                                                                                                |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `entity`                  | Root entity used for status and member or value attributes.                                                                                            |
+| `entity`                  | Root entity used for status and member or value attributes. Optional for a summary tile built only from explicit or matching entities.                |
 | `card`                    | Optional Lovelace card shown on the dashboard. Its tap opens this popup. Without it, the card uses a Mushroom template card and top-level tile fields. |
 | `summary_tile`            | Optional built-in compact tile with `name` and optional `icon`; shows the first section's active count. Use instead of `card`.                      |
 | `popup.title`             | Popup heading. Defaults to the root entity's friendly name.                                                                                            |
@@ -16,7 +16,7 @@ For a badge above a dashboard view, use `type: custom:entity-popup-badge` with t
 | `popup.width`             | Optional desktop popup width in pixels, from 320 to 960. Defaults to 480; narrow screens still use a full-width bottom sheet.                          |
 | `popup.sections`          | One or more lists, in display order.                                                                                                                   |
 | `popup.actions_title`     | Heading above optional action buttons; defaults to `Actions`.                                                                                         |
-| `popup.actions`           | Optional buttons with `entity`, `service` (`domain.service`), and optional `name` and `icon`.                                                          |
+| `popup.actions`           | Optional buttons with `entity`, `service` (`domain.service`), and optional `name`, `icon`, and `data`.                                                  |
 | `compact`                 | Let a Mushroom tile use its natural height.                                                                                                            |
 
 ## Section sources
@@ -48,6 +48,6 @@ For a badge above a dashboard view, use `type: custom:entity-popup-badge` with t
 
 `mode: controls` calls `turn_on` or `turn_off` for lights, switches, fans, and input booleans. Covers use `open_cover` and `close_cover`, with a labeled button instead of a switch. Buttons are disabled while a service call is pending, when a cover is moving, or when an entity is unavailable. With `show: active`, an entity turned off or closed inside the popup remains visible until you close it, so the action is easy to reverse.
 
-The optional `summary_tile` reads the first section's active count. For an `entities` control section, set `singular`, `plural`, and `active_label` to choose its wording. `bulk_label` uses the section's configured entities and each entity's normal control service, without a second entity list. `popup.actions` sends the named Home Assistant service with `{entity_id: ...}`. These buttons are disabled when their entity is missing, unknown, or unavailable; they do not infer whether a scene or script is currently active.
+The optional `summary_tile` reads the first section's active count. For an `entities` control section, set `singular`, `plural`, and `active_label` to choose its wording. `bulk_label` uses the section's configured entities and each entity's normal control service, without a second entity list; matching domain and service calls are grouped. `popup.actions` sends the named Home Assistant service with its optional `data` and the configured `entity_id`. These buttons are disabled when their entity is missing, unknown, or unavailable; they do not infer whether a scene or script is currently active.
 
 For `values` and `records`, each list item is read only. A record with an `entity` can use `row_action: more-info` to open its native Home Assistant details. Use `details: [{field: value}, {field: last_changed, label: Updated, format: datetime}]` to show its reported reason and last state change. For custom summaries, use `status_text` or root attributes; otherwise only member sections display an automatic count.
