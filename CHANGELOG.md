@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+
+- Summary tiles use compact text sizing and stretch within their dashboard cell, aligning with adjacent tiles.
+- Popup control rows now highlight as one row, with inset content and no redundant chevron; row details and the right-hand control keep their existing actions.
+
 ## 1.3.0
 
 - Summary tiles built from explicit or matching entities no longer need an unrelated root entity.

@@ -394,10 +394,8 @@ export class EntityPopupCard extends HTMLElement {
             rowButton = document.createElement("button");
             rowButton.type = "button";
             rowButton.className = "row-button";
-            const chevron = document.createElement("ha-icon");
-            chevron.icon = "mdi:chevron-right";
-            chevron.setAttribute("aria-hidden", "true");
-            rowButton.append(icon, copy, chevron);
+            row.className = "interactive-row";
+            rowButton.append(icon, copy);
             rowButton.addEventListener("click", () => this._moreInfo(item.entity));
             row.append(rowButton);
           } else row.append(icon, copy);

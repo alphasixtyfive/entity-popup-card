@@ -31,8 +31,9 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 56px;
-  padding: 8px 10px;
+  height: 100%;
+  min-height: 54px;
+  padding: 9px 10px;
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -69,11 +70,12 @@
 }
 .summary-name {
   font-weight: var(--ha-font-weight-medium, 600);
+  line-height: 20px;
 }
 .summary-state {
-  margin-top: 2px;
   color: var(--secondary-text-color);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 16px;
 }
 dialog {
   box-sizing: border-box;
@@ -125,10 +127,16 @@ h2 {
   cursor: pointer;
 }
 .close:hover,
-.row-button:hover,
 .switch:hover,
 .cover-action:hover {
   background: var(--secondary-background-color, #8882);
+}
+.interactive-row:hover {
+  border-radius: 8px;
+  background: var(--secondary-background-color, #8882);
+}
+.interactive-row .switch:hover {
+  background: transparent;
 }
 button:focus-visible {
   outline: 2px solid var(--primary-color);
@@ -170,7 +178,7 @@ li {
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  padding: 4px 0;
+  padding: 4px var(--ha-space-3, 12px);
 }
 li + li {
   border-top: 1px solid var(--divider-color, #8883);
@@ -211,14 +219,6 @@ li ha-icon {
   font: inherit;
   text-align: left;
   cursor: pointer;
-}
-.row-button:only-child {
-  margin-inline: calc(-1 * var(--ha-space-3, 12px));
-  padding-inline: var(--ha-space-3, 12px);
-}
-.row-button ha-icon:last-child {
-  color: var(--secondary-text-color);
-  --mdc-icon-size: 18px;
 }
 .switch {
   flex: none;
