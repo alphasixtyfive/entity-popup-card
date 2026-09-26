@@ -1,8 +1,14 @@
 # Changelog
 
+## 1.4.0
+
+- Control rows show their state and open Home Assistant's more-info by default. Existing `show_state` and `row_action` settings still override this.
+- Summary tiles infer words such as `lights on` or `covers open` from a single control domain, and use the tile name as the popup title when no other title is supplied.
+- Generic service buttons leave unrelated light operations tracked; outdated screenshot previews were removed from the current docs.
+
 ## 1.3.3
 
-- Scene buttons stay available during unrelated light changes instead of briefly dimming. Starting a scene supersedes pending light feedback cleanly.
+- Scene buttons stay available during unrelated light changes instead of briefly dimming. Starting a scene clears pending light feedback.
 - Dividers return between popup rows, centered in generous space so they do not crowd the hover highlight. Two-line rows keep a 56px minimum height.
 - Service and bulk buttons use Home Assistant's neutral hover color. A new example shows mixed controls, readings, optional text, and service buttons in one popup.
 

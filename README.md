@@ -8,19 +8,9 @@ It works with the built-in Tile card. If you already use Mushroom template cards
 
 The maintained source is in [`src/`](src/). The root `entity-popup-card.js` is generated from those files so HACS can install one JavaScript resource.
 
-## Screenshots
+## Popup size
 
-These previews use example entities. The popup picks up your Home Assistant theme.
-
-| Light controls                                                           | Air & pollen                                                            |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| ![Light popup with two quick switches](docs/screenshots/light-popup.png) | ![Air and pollen readings in the popup](docs/screenshots/air-popup.png) |
-
-On a phone, the same popup opens as a bottom sheet:
-
-![Light popup as a phone bottom sheet](docs/screenshots/mobile-light-popup.png)
-
-The desktop popup is 480 pixels wide by default. Set `popup.width` to a whole number from 320 to 960 when longer names need more room. Narrow screens keep the full-width bottom sheet.
+The desktop popup is 480 pixels wide by default. Set `popup.width` to a whole number from 320 to 960 when longer names need more room. On a phone, the popup becomes a full-width bottom sheet.
 
 ```yaml
 popup:
@@ -43,7 +33,7 @@ type: module
 
 For a manual install, copy `entity-popup-card.js` to `/config/www/` and register `/local/entity-popup-card.js` as a JavaScript module.
 
-The card also appears in Home Assistant's **Add Card** picker. Its starter configuration uses a built-in Tile card; edit the YAML to list the entities you want in the popup.
+The card also appears in Home Assistant's **Add Card** picker. Its starter configuration uses a built-in Tile card and offers a quick control for a controllable entity; edit the YAML to list the entities you want in the popup.
 
 ## Light group
 
@@ -65,11 +55,6 @@ popup:
       domain: light
       mode: controls
       show: active
-      row_action: more-info
-      show_state: true
-      singular: light
-      plural: lights
-      active_label: "on"
       empty_text: All lights are off.
 ```
 
@@ -88,14 +73,8 @@ popup:
   title: Living room lights
   sections:
     - source: entities
-      domain: light
       mode: controls
-      show_state: true
-      row_action: more-info
       bulk_label: Turn all off
-      singular: light
-      plural: lights
-      active_label: "on"
       entities:
         - entity: light.living_room_lamp
           name: Lamp
@@ -123,14 +102,11 @@ summary_tile:
   name: Living room
   icon: mdi:sofa
 popup:
-  title: Living room
   status_text: Lights, climate, and shortcuts
   sections:
     - title: Lights and fan
       source: entities
       mode: controls
-      row_action: more-info
-      show_state: true
       bulk_label: Turn all off
       entities:
         - light.living_room_lamp
@@ -138,7 +114,6 @@ popup:
     - title: Blinds
       source: entities
       mode: controls
-      row_action: more-info
       entities:
         - cover.living_room
     - title: Climate
@@ -209,14 +184,11 @@ popup:
         - switch.desk
         - light.desk_lamp
       mode: controls
-      row_action: more-info
 ```
 
 ## Covers
 
 Covers get **Open** and **Close** buttons instead of switches. While a cover is opening or closing, the button waits for its next state. Tap the row name for Home Assistant's full cover controls, including position and tilt where supported.
-
-![Cover popup with Open and Close actions](docs/screenshots/cover-popup.png)
 
 ```yaml
 type: custom:entity-popup-card
@@ -232,8 +204,6 @@ popup:
         - cover.living_room
         - cover.bedroom
       mode: controls
-      show_state: true
-      row_action: more-info
 ```
 
 ## Mushroom tiles
@@ -254,7 +224,6 @@ popup:
       domain: light
       mode: controls
       show: active
-      row_action: more-info
 ```
 
 ## Compact badges

@@ -26,12 +26,14 @@ const COVER = Object.freeze({
   activeLabel: "open",
 });
 
+const named = (control, singular, plural) => Object.freeze({ ...control, singular, plural });
+
 export const CONTROL_TYPES = new Map([
-  ["light", ON_OFF],
-  ["switch", ON_OFF],
-  ["fan", ON_OFF],
-  ["input_boolean", ON_OFF],
-  ["cover", COVER],
+  ["light", named(ON_OFF, "light", "lights")],
+  ["switch", named(ON_OFF, "switch", "switches")],
+  ["fan", named(ON_OFF, "fan", "fans")],
+  ["input_boolean", named(ON_OFF, "control", "controls")],
+  ["cover", named(COVER, "cover", "covers")],
 ]);
 
 export function controlFor(entityId) {

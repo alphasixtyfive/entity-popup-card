@@ -13,7 +13,13 @@ export class EntityPopupCard extends HTMLElement {
       card: { type: "tile", entity },
       popup: {
         sections: [
-          { source: "entities", entities: [entity], show_state: true, row_action: "more-info" },
+          {
+            source: "entities",
+            entities: [entity],
+            ...(controlFor(entity)
+              ? { mode: "controls" }
+              : { show_state: true, row_action: "more-info" }),
+          },
         ],
       },
     };
@@ -207,9 +213,15 @@ export class EntityPopupCard extends HTMLElement {
       return "";
     if (!snapshot.membershipKnown) return "Items unavailable";
     const count = snapshot.activeCount;
-    const noun = count === 1 ? section.singular || "item" : section.plural || "items";
-    const control =
-      section.mode === "controls" && section.domain ? CONTROL_TYPES.get(section.domain) : null;
+    const domains = new Set(snapshot.allItems.map((item) => item.entity?.split(".")[0]));
+    const domain = section.domain || (domains.size === 1 ? domains.values().next().value : null);
+    const control = section.mode === "controls" ? CONTROL_TYPES.get(domain) : null;
+    const noun =
+      count === 1
+        ? section.singular ||
+          control?.singular ||
+          (section.mode === "controls" ? "control" : "item")
+        : section.plural || control?.plural || (section.mode === "controls" ? "controls" : "items");
     const unavailable = snapshot.allItems.filter((item) =>
       ["unknown", "unavailable"].includes(item.state),
     ).length;
@@ -276,7 +288,7 @@ export class EntityPopupCard extends HTMLElement {
 
   _detail(item, section) {
     const parts = [];
-    if (section.show_state && item.entity) {
+    if ((section.show_state ?? section.mode === "controls") && item.entity) {
       const state = this._hass?.states?.[item.entity];
       const label =
         section.state_labels?.[item.state] ||
@@ -310,7 +322,11 @@ export class EntityPopupCard extends HTMLElement {
     const config = this._config.popup;
     const source = this._hass?.states?.[this._config.entity];
     this._title.textContent =
-      config.title || this._config.dialog_title || source?.attributes?.friendly_name || "Details";
+      config.title ||
+      this._config.dialog_title ||
+      source?.attributes?.friendly_name ||
+      this._config.summary_tile?.name ||
+      "Details";
     const snapshots = config.sections.map((section) =>
       collectSection(this._hass?.states, this._config.entity, section),
     );
@@ -338,6 +354,7 @@ export class EntityPopupCard extends HTMLElement {
     for (const [index, section] of config.sections.entries()) {
       const snapshot = snapshots[index];
       const { list, empty, missing, bulk } = this._sectionNode(index, section);
+      const rowAction = section.row_action ?? (section.mode === "controls" ? "more-info" : "none");
       const current = new Map(
         snapshot.allItems.filter((item) => item.entity).map((item) => [item.entity, item]),
       );
@@ -390,7 +407,7 @@ export class EntityPopupCard extends HTMLElement {
           detail.className = "detail";
           copy.append(name, detail);
           let control, rowButton;
-          if (section.row_action === "more-info" && item.entity) {
+          if (rowAction === "more-info" && item.entity) {
             rowButton = document.createElement("button");
             rowButton.type = "button";
             rowButton.className = "row-button";
@@ -457,7 +474,7 @@ export class EntityPopupCard extends HTMLElement {
           parts.control.title = busy ? "Updating…" : action?.label || "Unavailable";
           if (parts.rowButton)
             parts.rowButton.setAttribute("aria-label", `${item.name}. More information`);
-        } else if (section.row_action === "more-info" && parts.control)
+        } else if (rowAction === "more-info" && parts.control)
           parts.control.setAttribute("aria-label", `${item.name}. More information`);
         if (list.children[rowIndex] !== parts.row)
           list.insertBefore(parts.row, list.children[rowIndex] || null);
@@ -542,7 +559,6 @@ export class EntityPopupCard extends HTMLElement {
       typeof this._hass?.callService !== "function"
     )
       return;
-    this._clearOperations();
     const pending = {};
     this._actionPending.set(index, pending);
     this._errors.delete(`action:${index}`);
@@ -644,7 +660,7 @@ export class EntityPopupCard extends HTMLElement {
         } else {
           operation.settled = true;
           operation.timer = setTimeout(
-            () => this._finishOperation(key, operation, entity, "No update received. Try again."),
+            () => this._finishOperation(key, operation, entity, "Requested state not reached."),
             STATE_UPDATE_TIMEOUT_MS,
           );
         }

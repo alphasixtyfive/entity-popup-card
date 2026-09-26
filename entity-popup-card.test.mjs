@@ -516,7 +516,41 @@ test("a generic room tile shows the first control count and offers configured ac
   assert.match(env.card._error.textContent, /Morning: Couldn't run the action/);
 });
 
-test("scene buttons stay available while a light command is pending", async () => {
+test("control rows use native details and state defaults with explicit overrides", () => {
+  const section = { source: "entities", mode: "controls", entities: ["light.lamp"] };
+  const config = { summary_tile: { name: "Room" }, popup: { sections: [section] } };
+  const states = { "light.lamp": state("off", "Lamp") };
+  const env = environment(config, states);
+  assert.equal(env.card._summaryParts.state.textContent, "0 lights on");
+  env.card._summaryParts.button.dispatchEvent(new Event("click"));
+  assert.equal(env.card._title.textContent, "Room");
+  assert.ok(env.card._rows.get("0:light.lamp").rowButton);
+  assert.equal(env.card._rows.get("0:light.lamp").detail.textContent, "Off");
+
+  const override = environment(
+    {
+      ...config,
+      popup: { sections: [{ ...section, row_action: "none", show_state: false }] },
+    },
+    states,
+  );
+  override.card._summaryParts.button.dispatchEvent(new Event("click"));
+  assert.equal(override.card._rows.get("0:light.lamp").rowButton, undefined);
+  assert.equal(override.card._rows.get("0:light.lamp").detail.hidden, true);
+
+  const mixed = environment(
+    {
+      summary_tile: { name: "Room" },
+      popup: {
+        sections: [{ source: "entities", mode: "controls", entities: ["light.lamp", "fan.room"] }],
+      },
+    },
+    { "light.lamp": state("on", "Lamp"), "fan.room": state("off", "Fan") },
+  );
+  assert.equal(mixed.card._summaryParts.state.textContent, "1 control active");
+});
+
+test("scene buttons stay available without discarding a pending light command", async () => {
   const config = {
     summary_tile: { name: "Room" },
     popup: {
@@ -534,7 +568,9 @@ test("scene buttons stay available while a light command is pending", async () =
   env.card._hass.callService = (...args) => {
     calls.push(args);
     return args[0] === "light"
-      ? new Promise((resolve) => { finishLight = resolve; })
+      ? new Promise((resolve) => {
+          finishLight = resolve;
+        })
       : Promise.resolve();
   };
   env.card._summaryParts.button.dispatchEvent(new Event("click"));
@@ -546,14 +582,17 @@ test("scene buttons stay available while a light command is pending", async () =
   assert.equal(env.card._actionButtons[0].button, scene);
 
   scene.dispatchEvent(new Event("click"));
-  assert.equal(env.card._operations.size, 0);
+  assert.equal(env.card._operations.size, 1);
   await flush();
   assert.deepEqual(servicesAsJson(calls), [
     ["light", "turn_on", { entity_id: "light.lamp" }],
     ["scene", "turn_on", { entity_id: "scene.evening" }],
   ]);
+  states["light.lamp"].state = "on";
   finishLight();
   await flush();
+  env.card.hass = env.card._hass;
+  assert.equal(env.card._operations.size, 0);
   assert.equal(env.card._error.hidden, true);
 });
 
@@ -965,7 +1004,10 @@ test("show all keeps off controls visible and a native tile needs no tap config"
   assert.equal(env.created[0].config.type, "tile");
   assert.equal(env.created[0].config.tap_action.action, "fire-dom-event");
   assert.equal(env.browserWindow.customCards[0].type, "entity-popup-card");
-  assert.equal(env.classes.get("entity-popup-card").getStubConfig().card.type, "tile");
+  const Card = env.classes.get("entity-popup-card");
+  assert.equal(Card.getStubConfig().card.type, "tile");
+  assert.equal(Card.getStubConfig(null, ["light.a"]).popup.sections[0].mode, "controls");
+  assert.equal(Card.getStubConfig(null, ["sensor.air"]).popup.sections[0].show_state, true);
   env.card.dispatchEvent(env.tap("fire-dom-event"));
   assert.deepEqual([...env.card._rows.keys()], ["0:light.a", "0:light.b"]);
   assert.equal(env.card._rows.get("0:light.b").control.disabled, false);
