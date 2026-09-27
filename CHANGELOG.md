@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Match popup surfaces and controls to Home Assistant dialog and button theme tokens.
+
 ## 1.4.0
 
 - Control rows show their state and open Home Assistant's more-info by default. Existing `show_state` and `row_action` settings still override this.

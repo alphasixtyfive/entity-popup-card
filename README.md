@@ -11,6 +11,7 @@ The maintained source is in [`src/`](src/). The root `entity-popup-card.js` is g
 ## Popup size
 
 The desktop popup is 480 pixels wide by default. Set `popup.width` to a whole number from 320 to 960 when longer names need more room. On a phone, the popup becomes a full-width bottom sheet.
+The popup follows Home Assistant's dialog radius, surface, and shadow tokens. Buttons follow the active theme too, including square-corner themes.
 
 ```yaml
 popup:

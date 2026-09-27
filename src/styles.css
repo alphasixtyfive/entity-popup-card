@@ -83,13 +83,13 @@ dialog {
   max-height: min(80dvh, 720px);
   padding: 0;
   border: 1px solid var(--divider-color, #555);
-  border-radius: var(--ha-border-radius-3xl, 24px);
+  border-radius: var(--ha-dialog-border-radius, var(--ha-border-radius-3xl, 24px));
   color: var(--primary-text-color, #212121);
   background: var(
-    --ha-color-surface-default,
-    var(--ha-card-background, var(--card-background-color, #fff))
+    --ha-dialog-surface-background,
+    var(--card-background-color, var(--ha-color-surface-default, #fff))
   );
-  box-shadow: var(--ha-box-shadow-l, 0 12px 40px #0006);
+  box-shadow: var(--dialog-box-shadow, var(--ha-box-shadow-l, 0 12px 40px #0006));
   overflow: auto;
 }
 dialog::backdrop {
@@ -132,7 +132,7 @@ h2 {
   background: var(--secondary-background-color, #8882);
 }
 .interactive-row:hover {
-  border-radius: 8px;
+  border-radius: var(--ha-button-border-radius, var(--ha-border-radius-md, 8px));
   background: var(--secondary-background-color, #8882);
 }
 .interactive-row .switch:hover {
@@ -224,7 +224,7 @@ li ha-icon {
   min-height: 48px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--ha-button-border-radius, var(--ha-border-radius-md, 8px));
   background: transparent;
   color: inherit;
   font: inherit;
@@ -239,7 +239,7 @@ li ha-icon {
   height: 44px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ha-button-border-radius, var(--ha-border-radius-md, 8px));
   background: transparent;
   cursor: pointer;
 }
@@ -281,7 +281,7 @@ li ha-icon {
   min-height: 36px;
   padding: 0 12px;
   border: 1px solid var(--divider-color, #8883);
-  border-radius: 18px;
+  border-radius: var(--ha-border-radius-pill, 9999px);
   background: transparent;
   color: var(--primary-color);
   font: inherit;
@@ -302,7 +302,7 @@ li ha-icon {
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--divider-color, #8885);
-  border-radius: 22px;
+  border-radius: var(--ha-border-radius-pill, 9999px);
   background: transparent;
   color: var(--primary-text-color);
   font: inherit;
@@ -333,7 +333,7 @@ li ha-icon {
   min-height: 52px;
   padding: 8px 12px;
   border: 1px solid var(--divider-color, #8885);
-  border-radius: 14px;
+  border-radius: var(--ha-button-border-radius, var(--ha-border-radius-md, 8px));
   background: var(--secondary-background-color, #8882);
   color: var(--primary-text-color);
   font: inherit;
@@ -386,7 +386,8 @@ li[data-active="true"] .row-button > ha-icon:first-child {
     max-width: none;
     max-height: calc(100dvh - max(var(--safe-area-inset-top, 0px), 48px));
     margin: 0;
-    border-radius: var(--ha-border-radius-3xl, 24px) var(--ha-border-radius-3xl, 24px) 0 0;
+    border-radius: var(--ha-dialog-border-radius, var(--ha-border-radius-3xl, 24px))
+      var(--ha-dialog-border-radius, var(--ha-border-radius-3xl, 24px)) 0 0;
     border-inline: 0;
     border-bottom: 0;
   }
