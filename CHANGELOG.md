@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.1
 
 - Match popup surfaces and controls to Home Assistant dialog and button theme tokens.
 
