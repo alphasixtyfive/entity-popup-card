@@ -15,9 +15,7 @@ card:
   type: custom:mushroom-template-card
   primary: Upstairs lights
   icon: mdi:home-floor-1
-  icon_tap_action:
-    action: toggle
-  secondary: "{% if not has_value(entity) %}Unavailable{% elif is_state(entity, 'off') %}All off{% else %}{{ expand(state_attr(entity, 'entity_id') or []) | selectattr('state', 'eq', 'on') | list | count }} on{% endif %}"
+  secondary: "{{ states(entity) | capitalize }}"
 popup:
   title: Upstairs lights
   source:
@@ -27,22 +25,25 @@ popup:
   card:
     type: entities
     show_header_toggle: false
-    footer:
-      type: buttons
-      entities:
-        - entity: light.upstrairs
-          name: All off
-          show_icon: false
-          show_name: true
-          tap_action:
-            action: perform-action
-            perform_action: light.turn_off
-            target:
-              entity_id: light.upstrairs
   empty: All lights are off.
 ```
 
-`card` accepts a Lovelace card that supports `tap_action`. The wrapper assigns its tap action to open the dialog. Other actions inside the card, such as Mushroom's `icon_tap_action`, still work.
+`card` accepts a Lovelace card that supports `tap_action`. The wrapper assigns its tap action to open the dialog. Other actions inside the card, such as Mushroom's `icon_tap_action`, still work. Add a native Entities `footer` to `popup.card` if you want an **All off** button:
+
+```yaml
+footer:
+  type: buttons
+  entities:
+    - entity: light.upstrairs
+      name: All off
+      show_icon: false
+      show_name: true
+      tap_action:
+        action: perform-action
+        perform_action: light.turn_off
+        target:
+          entity_id: light.upstrairs
+```
 
 `popup.card` accepts a Lovelace card configuration. For a fixed list, configure it directly:
 

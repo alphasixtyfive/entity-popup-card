@@ -123,9 +123,9 @@ export class NativeEntityPopupCard extends HTMLElement {
         :host([badge]) .trigger, :host([badge]) .trigger > * { height: auto; }
       </style>
       <div class="trigger"></div>`;
-    this._overlayHost = document.createElement("div");
-    this._overlayHost.attachShadow({ mode: "open" });
-    this._overlayHost.shadowRoot.innerHTML = `
+    this._dialogRoot = document.createElement("div");
+    this._dialogRoot.attachShadow({ mode: "open" });
+    this._dialogRoot.shadowRoot.innerHTML = `
       <style>
         :host { display: contents; }
         ha-adaptive-dialog { --ha-dialog-width-md: var(--entity-popup-width, 480px); --dialog-content-padding: 0; }
@@ -143,13 +143,17 @@ export class NativeEntityPopupCard extends HTMLElement {
         <div class="content"><div class="popup-card"></div><p class="empty" hidden>Nothing to show.</p></div>
       </ha-adaptive-dialog>`;
     this._trigger = this.shadowRoot.querySelector(".trigger");
-    this._dialog = this._overlayHost.shadowRoot.querySelector("ha-adaptive-dialog");
-    this._title = this._overlayHost.shadowRoot.querySelector("h2");
-    this._popup = this._overlayHost.shadowRoot.querySelector(".popup-card");
-    this._content = this._overlayHost.shadowRoot.querySelector(".content");
-    this._empty = this._overlayHost.shadowRoot.querySelector(".empty");
+    this._dialog = this._dialogRoot.shadowRoot.querySelector("ha-adaptive-dialog");
+    this._title = this._dialogRoot.shadowRoot.querySelector("h2");
+    this._popup = this._dialogRoot.shadowRoot.querySelector(".popup-card");
+    this._content = this._dialogRoot.shadowRoot.querySelector(".content");
+    this._empty = this._dialogRoot.shadowRoot.querySelector(".empty");
     this._revision = 0;
     this._retained = new Set();
+    this._onLocationChange = () => {
+      if (this._dialogActive && window.location.pathname !== this._openPath)
+        this._dialog.open = false;
+    };
     const openFromTrigger = (event) => {
       if (!this._triggerCard || !event.composedPath().includes(this._triggerCard)) return;
       event.stopPropagation();
@@ -189,7 +193,9 @@ export class NativeEntityPopupCard extends HTMLElement {
       this._retained.clear();
       this._popupCard = null;
       this._popup.replaceChildren();
-      this._overlayHost.remove();
+      window.removeEventListener("location-changed", this._onLocationChange);
+      window.removeEventListener("popstate", this._onLocationChange);
+      this._dialogRoot.remove();
       const opener = this._opener;
       this._opener = null;
       if (this._nextMoreInfo) {
@@ -283,18 +289,20 @@ export class NativeEntityPopupCard extends HTMLElement {
     }
     if (this._dialogActive) return;
     this._dialogActive = true;
-    let view = this;
-    while (view && view.localName !== "hui-view") view = view.parentNode || view.host;
-    (view || document.body).append(this._overlayHost);
     const revision = this._revision;
+    const openPath = window.location.pathname;
+    document.body.append(this._dialogRoot);
     await customElements.whenDefined("ha-adaptive-dialog");
     await this._dialog.updateComplete;
-    if (!this.isConnected || revision !== this._revision) {
+    if (revision !== this._revision || window.location.pathname !== openPath) {
       this._dialogActive = false;
-      this._overlayHost.remove();
+      this._dialogRoot.remove();
       return;
     }
     this._opener = opener;
+    this._openPath = openPath;
+    window.addEventListener("location-changed", this._onLocationChange);
+    window.addEventListener("popstate", this._onLocationChange);
     this._retained.clear();
     this._title.textContent =
       this._config.popup.title ||
@@ -333,7 +341,7 @@ export class NativeEntityPopupCard extends HTMLElement {
     this._popupSignature = signature;
     try {
       const helpers = await window.loadCardHelpers();
-      if (revision !== this._revision || !this.isConnected || !this._dialog.open) return;
+      if (revision !== this._revision || !this._dialog.open) return;
       const card = helpers.createCardElement(config);
       if (this._hass) card.hass = this._hass;
       this._popupCard = card;
