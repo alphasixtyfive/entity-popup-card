@@ -1,14 +1,14 @@
 {
   "name": "entity-popup-card",
-  "version": "1.4.1",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "A compact live entity popup for Home Assistant dashboards",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check-build": "node scripts/build.mjs --check",
-    "test": "node --test entity-popup-card.test.mjs && npm run check-build",
-    "format": "prettier --write src scripts entity-popup-card.test.mjs"
+    "test": "node --test native.test.mjs && npm run check-build",
+    "format": "prettier --write src scripts native.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

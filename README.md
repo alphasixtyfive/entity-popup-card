@@ -1,264 +1,71 @@
 # Entity Popup Card
 
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alphasixtyfive&repository=entity-popup-card&category=plugin)
-
-A small Home Assistant dashboard card that opens a live list of related entities. It can show a room summary tile, quick controls, and optional service buttons in the same popup. Tapping a row can open Home Assistant's own more-info dialog for full controls or history.
-
-It works with the built-in Tile card. If you already use Mushroom template cards, you can keep those too.
-
-The maintained source is in [`src/`](src/). The root `entity-popup-card.js` is generated from those files so HACS can install one JavaScript resource.
-
-## Popup size
-
-The desktop popup is 480 pixels wide by default. Set `popup.width` to a whole number from 320 to 960 when longer names need more room. On a phone, the popup becomes a full-width bottom sheet.
-The popup follows Home Assistant's dialog radius, surface, and shadow tokens. Buttons follow the active theme too, including square-corner themes.
-
-```yaml
-popup:
-  width: 600
-  sections:
-    - source: entities
-      entities: [sensor.outdoor_air_quality]
-```
+A small Home Assistant dashboard wrapper that opens a Lovelace card in Home Assistant's adaptive dialog. Choose the tile with `card` and the dialog content with `popup.card`. Entity controls and state formatting come from Home Assistant's cards.
 
 ## Install
 
-Click the HACS button above, then download the repository. If the button does not find it yet, add `https://github.com/alphasixtyfive/entity-popup-card` in **HACS → Custom repositories**, select **Dashboard**, and download it. Refresh Home Assistant after installation.
+Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either with HACS or by copying it to `/config/www` and using `/local/entity-popup-card.js`. A fresh version query such as `?v=1.0.0` helps refresh browser caches after an update.
 
-HACS normally registers the dashboard resource. If you need to add it yourself, use **Settings → Dashboards → Resources**:
-
-```yaml
-url: /hacsfiles/entity-popup-card/entity-popup-card.js
-type: module
-```
-
-For a manual install, copy `entity-popup-card.js` to `/config/www/` and register `/local/entity-popup-card.js` as a JavaScript module.
-
-The card also appears in Home Assistant's **Add Card** picker. Its starter configuration uses a built-in Tile card and offers a quick control for a controllable entity; edit the YAML to list the entities you want in the popup.
-
-## Light group
-
-This shows lights that are on. The name opens the light's normal more-info dialog; the switch beside it turns the light off. A light you turn off stays in the open popup so you can turn it back on. The tile icon toggles the whole group.
+## Example
 
 ```yaml
 type: custom:entity-popup-card
-entity: light.downstairs
+entity: light.upstrairs
 card:
-  type: tile
-  entity: light.downstairs
+  type: custom:mushroom-template-card
+  primary: Upstairs lights
+  icon: mdi:home-floor-1
   icon_tap_action:
     action: toggle
+  secondary: "{% if not has_value(entity) %}Unavailable{% elif is_state(entity, 'off') %}All off{% else %}{{ expand(state_attr(entity, 'entity_id') or []) | selectattr('state', 'eq', 'on') | list | count }} on{% endif %}"
 popup:
-  title: Downstairs lights
-  sections:
-    - source: members
-      recursive: true
-      domain: light
-      mode: controls
-      show: active
-      empty_text: All lights are off.
+  title: Upstairs lights
+  source:
+    recursive: true
+    domain: light
+    state: "on"
+  card:
+    type: entities
+    show_header_toggle: false
+    footer:
+      type: buttons
+      entities:
+        - entity: light.upstrairs
+          name: All off
+          show_icon: false
+          show_name: true
+          tap_action:
+            action: perform-action
+            perform_action: light.turn_off
+            target:
+              entity_id: light.upstrairs
+  empty: All lights are off.
 ```
 
-`members` reads the group's `entity_id` attribute. If your group uses another attribute, set `attribute:` in the section.
+`card` accepts a Lovelace card that supports `tap_action`. The wrapper assigns its tap action to open the dialog. Other actions inside the card, such as Mushroom's `icon_tap_action`, still work.
 
-## A room with optional actions
-
-`summary_tile` shows the active count from the first popup section without a separate group entity or dashboard template. When the sections use explicit entities or a match, no root `entity` is needed. The popup can also offer service buttons. Each button names its own entity and service, so the card has no built-in scene or room assumptions.
+`popup.card` accepts a Lovelace card configuration. For a fixed list, configure it directly:
 
 ```yaml
-type: custom:entity-popup-card
-summary_tile:
-  name: Living room
-  icon: mdi:lightbulb-multiple
-popup:
-  title: Living room lights
-  sections:
-    - source: entities
-      mode: controls
-      bulk_label: Turn all off
-      entities:
-        - entity: light.living_room_lamp
-          name: Lamp
-        - entity: light.living_room_ceiling
-          name: Ceiling
-  actions_title: Scenes
-  actions:
-    - entity: scene.movie_night
-      service: scene.turn_on
-      name: Movie night
-      icon: mdi:movie-open
-      data:
-        transition: 2
-```
-
-`bulk_label` applies each active control's normal off action without repeating the entity list. Matching controls are sent in one Home Assistant service call. Buttons are disabled when their entity is unavailable. A service button reports a failed call, but does not claim the resulting devices reached a particular state.
-
-## Mix controls, readings, and buttons
-
-Sections appear in the order you list them. Each can show controls or read-only entities. `status_text` adds a short line under the title, and `actions` adds service buttons such as scenes or scripts. `bulk_label` is optional on each control section; leave it out when you do not want a **Turn all off** button.
-
-```yaml
-type: custom:entity-popup-card
-summary_tile:
-  name: Living room
-  icon: mdi:sofa
-popup:
-  status_text: Lights, climate, and shortcuts
-  sections:
-    - title: Lights and fan
-      source: entities
-      mode: controls
-      bulk_label: Turn all off
-      entities:
-        - light.living_room_lamp
-        - fan.living_room
-    - title: Blinds
-      source: entities
-      mode: controls
-      entities:
-        - cover.living_room
-    - title: Climate
-      source: entities
-      show_state: true
-      row_action: more-info
-      entities:
-        - sensor.living_room_temperature
-  actions_title: Shortcuts
-  actions:
-    - entity: scene.movie_night
-      service: scene.turn_on
-      name: Movie night
-    - entity: script.good_night
-      service: script.turn_on
-      name: Good night
-```
-
-Replace the example entity IDs with yours. The bulk button affects only **Lights and fan**; the cover remains a separate control. Service buttons stay available while a light is changing.
-
-## A short sensor list
-
-The popup can also show selected readings. It keeps your chosen order and uses Home Assistant's state formatting, including units and translated states when available.
-
-```yaml
-type: custom:entity-popup-card
-entity: sensor.outdoor_air_quality
-card:
-  type: tile
-  entity: sensor.outdoor_air_quality
 popup:
   title: Air & pollen
-  sections:
-    - title: Air quality
-      source: entities
-      entities:
-        - sensor.outdoor_air_quality
-      show_state: true
-      row_action: more-info
-    - title: Pollen
-      source: entities
-      entities:
-        - entity: sensor.tree_pollen
-          name: Trees
-        - entity: sensor.grass_pollen
-          name: Grass
-        - entity: sensor.weed_pollen
-          name: Weeds
-      show_state: true
-      row_action: more-info
+  card:
+    type: entities
+    show_header_toggle: false
+    entities:
+      - sensor.home_uaqi_category
+      - type: divider
+      - sensor.kleenex_pollen_trees_level
+      - sensor.kleenex_pollen_grass_level
+      - sensor.kleenex_pollen_weeds_level
 ```
 
-## Individual switches
+For a live list, add `popup.source` and omit `popup.card.entities`. The source reads an array attribute from `entity`. Set `source.entity` to read another entity, `source.attribute` for an attribute other than `entity_id`, `source.recursive: true` to expand nested groups, and `source.domain` or `source.state` to filter rows. `source` works with an `entities` popup card. Active rows remain visible until the dialog closes so a light switched off there can be switched on again.
 
-For a fixed set of on/off entities, use `source: entities` with `mode: controls`. The card calls each entity's own domain service, so a list can contain lights, switches, fans, and input booleans.
-
-```yaml
-type: custom:entity-popup-card
-entity: switch.desk
-card:
-  type: tile
-  entity: switch.desk
-popup:
-  title: Desk
-  sections:
-    - source: entities
-      entities:
-        - switch.desk
-        - light.desk_lamp
-      mode: controls
-```
-
-## Covers
-
-Covers get **Open** and **Close** buttons instead of switches. While a cover is opening or closing, the button waits for its next state. Tap the row name for Home Assistant's full cover controls, including position and tilt where supported.
-
-```yaml
-type: custom:entity-popup-card
-entity: cover.living_room
-card:
-  type: tile
-  entity: cover.living_room
-popup:
-  title: Blinds
-  sections:
-    - source: entities
-      entities:
-        - cover.living_room
-        - cover.bedroom
-      mode: controls
-```
-
-## Mushroom tiles
-
-If you leave out `card:`, the card wraps a Mushroom template card. Put Mushroom's usual `primary`, `secondary`, `icon`, and `icon_tap_action` settings at the top level. Install Mushroom separately. The popup handles the tile's tap action, so you do not need to set `tap_action: fire-dom-event`.
-
-```yaml
-type: custom:entity-popup-card
-entity: light.downstairs
-primary: Downstairs lights
-secondary: "{{ states(entity) | title }}"
-icon: mdi:home-floor-0
-icon_tap_action:
-  action: toggle
-popup:
-  sections:
-    - source: members
-      domain: light
-      mode: controls
-      show: active
-```
-
-## Compact badges
-
-Use `custom:entity-popup-badge` above a dashboard view when an issue needs a small, visible entry point. The badge uses Mushroom's template badge and opens the same popup. Keep issue discovery in a Home Assistant sensor; the badge only reads its `summary` and `items` attributes.
-
-```yaml
-type: custom:entity-popup-badge
-entity: binary_sensor.home_attention
-label: Needs attention
-content: "{{ state_attr(entity, 'summary') }}"
-icon: mdi:alert-circle-outline
-color: red
-popup:
-  title: Needs attention
-  sections:
-    - source: records
-      attribute: items
-      row_action: more-info
-      details:
-        - field: value
-        - field: last_changed
-          label: Updated
-          format: datetime
-visibility:
-  - condition: state
-    entity: binary_sensor.home_attention
-    state: "on"
-```
-
-The [configuration reference](docs/configuration.md) covers the other sources, row details, and status options.
+`popup.title`, `popup.empty`, and `popup.width` (320–960 pixels) are optional. Selecting an entity row opens Home Assistant's more-info dialog. A badge trigger is also available as `custom:entity-popup-badge` with a nested `badge` Mushroom template badge configuration and the same `popup` options.
 
 ## Development
 
-The files in `src/` are the source of truth. Run `npm ci`, edit the source, then run `npm run build` to update the HACS file. `npm test` checks the behavior and confirms that the generated file matches the source. It has been tested with Home Assistant 2026.9.3.
+Run `npm ci`, `npm run build`, and `npm test`. The root `entity-popup-card.js` is generated from `src/` and committed for HACS.
 
-The dialog follows Home Assistant's current [more-info layout](https://github.com/home-assistant/frontend/blob/dev/src/dialogs/more-info/ha-more-info-dialog.ts) and [dashboard card API](https://developers.home-assistant.io/docs/frontend/custom-ui/custom-card/). The row details stay native; this card does not copy Home Assistant's light color, brightness, or history controls.
+Licensed under [MIT](LICENSE).
