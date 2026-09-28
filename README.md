@@ -12,7 +12,7 @@ Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either
 
 ```yaml
 type: custom:entity-popup-card
-entity: light.upstrairs
+entity: light.upstairs
 card:
   type: custom:mushroom-template-card
   primary: Upstairs lights
@@ -36,7 +36,7 @@ popup:
 footer:
   type: buttons
   entities:
-    - entity: light.upstrairs
+    - entity: light.upstairs
       name: All off
       show_icon: false
       show_name: true
@@ -44,7 +44,7 @@ footer:
         action: perform-action
         perform_action: light.turn_off
         target:
-          entity_id: light.upstrairs
+          entity_id: light.upstairs
 ```
 
 `popup.card` accepts a Lovelace card configuration. For a fixed list, configure it directly:
