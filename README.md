@@ -4,7 +4,7 @@ A small Home Assistant dashboard wrapper that opens a Lovelace card in Home Assi
 
 ## Install
 
-Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either with HACS or by copying it to `/config/www` and using `/local/entity-popup-card.js`. A fresh version query such as `?v=1.0.0` helps refresh browser caches after an update.
+Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either with HACS or by copying it to `/config/www` and using `/local/entity-popup-card.js`. A fresh version query such as `?v=1.0.1` helps refresh browser caches after an update.
 
 ## Example
 
@@ -61,12 +61,12 @@ popup:
       - sensor.kleenex_pollen_weeds_level
 ```
 
-For a live list, add `popup.source` and omit `popup.card.entities`. The source reads an array attribute from `entity`. Set `source.entity` to read another entity, `source.attribute` for an attribute other than `entity_id`, `source.recursive: true` to expand nested groups, and `source.domain` or `source.state` to filter rows. `source` works with an `entities` popup card. Active rows remain visible until the dialog closes so a light switched off there can be switched on again.
+For a live list, add `popup.source` and omit `popup.card.entities`. The source reads an array attribute from `entity`. Set `source.entity` to read another entity, `source.attribute` for an attribute other than `entity_id`, `source.recursive: true` to expand nested groups, and `source.domain` or `source.state` to filter rows. `source` works with an `entities` popup card. Active rows remain visible until the dialog closes so a light switched off there can be switched on again. Native rows use the entity's icon; an icon set only on another dashboard tile will not carry over.
 
 `popup.title`, `popup.empty`, and `popup.width` (320–960 pixels) are optional. Selecting an entity row opens Home Assistant's more-info dialog. A badge trigger is also available as `custom:entity-popup-badge` with a nested `badge` Mushroom template badge configuration and the same `popup` options.
 
 ## Development
 
-Run `npm ci`, `npm run build`, and `npm test`. The root `entity-popup-card.js` is generated from `src/` and committed for HACS.
+Run `npm ci`, `npm run build`, and `npm test`. The root `entity-popup-card.js` is generated from `src/` and committed for HACS. Before releasing, open a popup with a native toggle and confirm the entity actually changes state in Home Assistant; a switch animation alone is not enough.
 
 Licensed under [MIT](LICENSE).

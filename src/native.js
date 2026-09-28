@@ -291,7 +291,9 @@ export class NativeEntityPopupCard extends HTMLElement {
     this._dialogActive = true;
     const revision = this._revision;
     const openPath = window.location.pathname;
-    document.body.append(this._dialogRoot);
+    // Keep native controls in Home Assistant's context, outside the changing view.
+    const host = document.querySelector("home-assistant")?.shadowRoot || this.parentNode;
+    host.append(this._dialogRoot);
     await customElements.whenDefined("ha-adaptive-dialog");
     await this._dialog.updateComplete;
     if (revision !== this._revision || window.location.pathname !== openPath) {
