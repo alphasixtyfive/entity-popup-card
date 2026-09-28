@@ -2,6 +2,8 @@
 
 A small Home Assistant dashboard wrapper that opens a Lovelace card in Home Assistant's adaptive dialog. Choose the tile with `card` and the dialog content with `popup.card`. Entity controls and state formatting come from Home Assistant's cards.
 
+![An Air & pollen popup built from a native Entities card](docs/images/air-pollen-popup.png)
+
 ## Install
 
 Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either with HACS or by copying it to `/config/www` and using `/local/entity-popup-card.js`. A fresh version query such as `?v=1.0.1` helps refresh browser caches after an update.
