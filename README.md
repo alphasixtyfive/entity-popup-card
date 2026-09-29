@@ -6,7 +6,7 @@ A small Home Assistant dashboard wrapper that opens a Lovelace card in Home Assi
 
 ## Install
 
-Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either with HACS or by copying it to `/config/www` and using `/local/entity-popup-card.js`. A fresh version query such as `?v=1.0.1` helps refresh browser caches after an update.
+Add `entity-popup-card.js` as a dashboard resource (`JavaScript module`), either with HACS or by copying it to `/config/www` and using `/local/entity-popup-card.js`. A fresh version query such as `?v=1.0.2` helps refresh browser caches after an update.
 
 ## Example
 

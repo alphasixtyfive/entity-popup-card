@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 — 29 September 2026
+
+- Start each popup with a fresh Home Assistant dialog after swipe-down dismissal, so a previous drag cannot leave the next popup partway down the screen.
+- Cancel an unfinished popup open when its card disconnects or its configuration changes.
+
 ## 1.0.1
 
 - Fixed native popup controls that appeared to switch but did not call Home Assistant.

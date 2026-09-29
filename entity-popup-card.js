@@ -129,6 +129,7 @@
       this._empty = this._dialogRoot.shadowRoot.querySelector(".empty");
       this._revision = 0;
       this._retained = /* @__PURE__ */ new Set();
+      this._opening = false;
       this._onLocationChange = () => {
         if (this._dialogActive && window.location.pathname !== this._openPath)
           this._dialog.open = false;
@@ -152,19 +153,21 @@
           this._open();
         }
       });
-      this._dialog.addEventListener("hass-more-info", (event) => {
+      this._onDialogMoreInfo = (event) => {
         if (this._popupCard && event.composedPath().includes(this._popupCard)) {
           event.stopPropagation();
           this._nextMoreInfo = event.detail?.entityId;
           this._dialog.open = false;
         }
-      });
-      this._dialog.addEventListener("closed", async (event) => {
+      };
+      this._onDialogClosed = async (event) => {
+        const dialog = this._dialog;
         const source = event.composedPath()[0];
-        if (source !== this._dialog && source?.parentNode !== this._dialog.shadowRoot) return;
+        if (source !== dialog && source?.parentNode !== dialog.shadowRoot) return;
         if (!this._dialogActive) return;
-        await this._dialog.updateComplete;
-        this._dialog.open = false;
+        await dialog.updateComplete;
+        if (dialog !== this._dialog || !this._dialogActive) return;
+        dialog.open = false;
         this._dialogActive = false;
         this._retained.clear();
         this._popupCard = null;
@@ -172,6 +175,7 @@
         window.removeEventListener("location-changed", this._onLocationChange);
         window.removeEventListener("popstate", this._onLocationChange);
         this._dialogRoot.remove();
+        this._replaceDialog();
         const opener = this._opener;
         this._opener = null;
         if (this._nextMoreInfo) {
@@ -185,7 +189,27 @@
             })
           );
         } else if (this.isConnected && opener?.isConnected) opener.focus({ preventScroll: true });
-      });
+      };
+      this._dialog.addEventListener("hass-more-info", this._onDialogMoreInfo);
+      this._dialog.addEventListener("closed", this._onDialogClosed);
+    }
+    _replaceDialog() {
+      const oldDialog = this._dialog;
+      const dialog = document.createElement("ha-adaptive-dialog");
+      dialog.setAttribute("aria-labelledby", "entity-popup-title");
+      dialog.append(...oldDialog.childNodes);
+      oldDialog.removeEventListener("hass-more-info", this._onDialogMoreInfo);
+      oldDialog.removeEventListener("closed", this._onDialogClosed);
+      oldDialog.replaceWith(dialog);
+      dialog.addEventListener("hass-more-info", this._onDialogMoreInfo);
+      dialog.addEventListener("closed", this._onDialogClosed);
+      this._dialog = dialog;
+    }
+    _cancelPendingOpen() {
+      if (!this._opening) return;
+      this._opening = false;
+      this._dialogActive = false;
+      this._dialogRoot.remove();
     }
     setConfig(config) {
       validateNativeConfig(config);
@@ -194,6 +218,7 @@
       this._signature = signature;
       this._config = config;
       this._revision++;
+      this._cancelPendingOpen();
       if (this._dialog.open) this._dialog.open = false;
       this._triggerCard = null;
       this._popupCard = null;
@@ -205,13 +230,17 @@
       this._content.classList.toggle("flat", config.popup.card.type === "entities");
       this._empty.textContent = config.popup.empty || "Nothing to show.";
       if (config.popup.width)
-        this._dialog.style.setProperty("--entity-popup-width", `${config.popup.width}px`);
-      else this._dialog.style.removeProperty("--entity-popup-width");
+        this._dialogRoot.style.setProperty("--entity-popup-width", `${config.popup.width}px`);
+      else this._dialogRoot.style.removeProperty("--entity-popup-width");
       if (this.isConnected) this._buildTrigger();
     }
     connectedCallback() {
       this._buildTrigger();
       if (this._dialog.open) this._renderPopup();
+    }
+    disconnectedCallback() {
+      this._revision++;
+      this._cancelPendingOpen();
     }
     set hass(hass) {
       this._hass = hass;
@@ -261,17 +290,20 @@
       }
       if (this._dialogActive) return;
       this._dialogActive = true;
+      this._opening = true;
       const revision = this._revision;
+      const dialog = this._dialog;
       const openPath = window.location.pathname;
       const host = document.querySelector("home-assistant")?.shadowRoot || this.parentNode;
       host.append(this._dialogRoot);
       await customElements.whenDefined("ha-adaptive-dialog");
-      await this._dialog.updateComplete;
-      if (revision !== this._revision || window.location.pathname !== openPath) {
-        this._dialogActive = false;
-        this._dialogRoot.remove();
+      await dialog.updateComplete;
+      if (!this._opening) return;
+      if (revision !== this._revision || dialog !== this._dialog || !this.isConnected || window.location.pathname !== openPath) {
+        this._cancelPendingOpen();
         return;
       }
+      this._opening = false;
       this._opener = opener;
       this._openPath = openPath;
       window.addEventListener("location-changed", this._onLocationChange);
