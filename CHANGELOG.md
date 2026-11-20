@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.4 — 20 November 2026
+
+- Keep the native popup card in place when its rows stay the same.
+- Skip rebuilding the row list after unrelated state changes and coalesce pending popup loads.
+
+## 1.0.3 — 29 September 2026
+
+- Give a native Entity Filter popup the same flat surface as an Entities popup, so filtered rows do not need `card-mod` for the popup border.
+
 ## 1.0.2 — 29 September 2026
 
 - Start each popup with a fresh Home Assistant dialog after swipe-down dismissal, so a previous drag cannot leave the next popup partway down the screen.

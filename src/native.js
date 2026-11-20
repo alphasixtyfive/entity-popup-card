@@ -68,12 +68,13 @@ export function validateNativeConfig(config) {
   }
 }
 
-export function sourceRows(states, rootEntity, source, retained = new Set()) {
-  const root = states?.[source.entity || rootEntity];
+export function sourceRows(states, rootEntity, source, retained = new Set(), seen = new Set()) {
+  const rootId = source.entity || rootEntity;
+  seen.add(rootId);
+  const root = states?.[rootId];
   if (!root || unavailable.has(root.state)) return null;
   const values = root.attributes?.[source.attribute || "entity_id"];
   if (!Array.isArray(values)) return null;
-  const seen = new Set([source.entity || rootEntity]);
   const rows = [];
   const visit = (value) => {
     const id = typeof value === "string" ? value : value?.entity;
@@ -195,6 +196,8 @@ export class NativeEntityPopupCard extends HTMLElement {
       this._dialogActive = false;
       this._retained.clear();
       this._popupCard = null;
+      this._popupSignature = null;
+      this._popupDependencies = null;
       this._popup.replaceChildren();
       window.removeEventListener("location-changed", this._onLocationChange);
       window.removeEventListener("popstate", this._onLocationChange);
@@ -251,11 +254,17 @@ export class NativeEntityPopupCard extends HTMLElement {
     this._triggerCard = null;
     this._popupCard = null;
     this._popupSignature = null;
+    this._popupDependencies = null;
     this._retained.clear();
     this._trigger.replaceChildren();
     this._popup.replaceChildren();
-    this._popup.classList.toggle("flat", config.popup.card.type === "entities");
-    this._content.classList.toggle("flat", config.popup.card.type === "entities");
+    const popupCard = config.popup.card;
+    const flat =
+      popupCard.type === "entities" ||
+      (popupCard.type === "entity-filter" &&
+        (!popupCard.card || popupCard.card.type === "entities"));
+    this._popup.classList.toggle("flat", flat);
+    this._content.classList.toggle("flat", flat);
     this._empty.textContent = config.popup.empty || "Nothing to show.";
     if (config.popup.width)
       this._dialogRoot.style.setProperty("--entity-popup-width", `${config.popup.width}px`);
@@ -273,9 +282,15 @@ export class NativeEntityPopupCard extends HTMLElement {
     this._cancelPendingOpen();
   }
   set hass(hass) {
+    const previous = this._hass?.states;
     this._hass = hass;
     if (this._triggerCard) this._triggerCard.hass = hass;
-    if (this._dialog.open) this._renderPopup();
+    if (!this._dialog.open) return;
+    if (previous && this._popupDependencies?.every((id) => previous[id] === hass?.states?.[id])) {
+      if (this._popupCard) this._popupCard.hass = hass;
+    } else {
+      this._renderPopup();
+    }
   }
   set layout(layout) {
     this._layout = layout;
@@ -357,9 +372,11 @@ export class NativeEntityPopupCard extends HTMLElement {
 
   async _renderPopup() {
     const source = this._config.popup.source;
+    const dependencies = new Set();
     const rows = source
-      ? sourceRows(this._hass?.states, this._config.entity, source, this._retained)
+      ? sourceRows(this._hass?.states, this._config.entity, source, this._retained, dependencies)
       : null;
+    this._popupDependencies = [...dependencies];
     if (rows && source.state)
       rows.forEach((row) => this._retained.add(typeof row === "string" ? row : row.entity));
     this._empty.textContent =
@@ -376,22 +393,26 @@ export class NativeEntityPopupCard extends HTMLElement {
     }
     const config = rows ? { ...this._config.popup.card, entities: rows } : this._config.popup.card;
     const signature = JSON.stringify(config);
-    if (signature === this._popupSignature && this._popupCard) {
-      this._popupCard.hass = this._hass;
+    if (signature === this._popupSignature) {
+      if (this._popupCard) this._popupCard.hass = this._hass;
       return;
     }
     const revision = ++this._revision;
+    const dialog = this._dialog;
+    const current = () => revision === this._revision && dialog === this._dialog && dialog.open;
     this._popupSignature = signature;
     try {
       const helpers = await window.loadCardHelpers();
-      if (revision !== this._revision || !this._dialog.open) return;
+      if (!current()) return;
       const card = helpers.createCardElement(config);
       if (this._hass) card.hass = this._hass;
       this._popupCard = card;
       this._popup.replaceChildren(card);
     } catch (error) {
-      if (revision !== this._revision) return;
+      if (!current()) return;
+      this._popupCard = null;
       this._popupSignature = null;
+      this._popupDependencies = null;
       this._popup.textContent = "Details unavailable";
       console.error("entity-popup-card: unable to create popup card", error);
     }

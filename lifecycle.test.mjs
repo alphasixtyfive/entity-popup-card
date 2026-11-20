@@ -70,6 +70,71 @@ async function makeCard() {
   return card;
 }
 
+test("native entity filter shares the flat popup surface", async () => {
+  const card = await makeCard();
+  card.setConfig({
+    ...config,
+    popup: {
+      ...config.popup,
+      card: { type: "entity-filter", entities: ["light.upstairs"], state_filter: ["on"] },
+    },
+  });
+  assert.equal(card._popup.classList.contains("flat"), true);
+  assert.equal(card._content.classList.contains("flat"), true);
+  card.setConfig({
+    ...config,
+    popup: {
+      ...config.popup,
+      card: {
+        type: "entity-filter",
+        entities: ["light.upstairs"],
+        state_filter: ["on"],
+        card: { type: "glance" },
+      },
+    },
+  });
+  assert.equal(card._popup.classList.contains("flat"), false);
+  card.remove();
+});
+
+test("an open source popup only rebuilds when its row membership changes", async () => {
+  const card = await makeCard();
+  card.setConfig({
+    ...config,
+    popup: {
+      card: { type: "entities" },
+      source: { entity: "sensor.lights", state: "on" },
+    },
+  });
+  const states = {
+    "sensor.lights": { state: "1", attributes: { entity_id: ["light.upstairs", "light.hall"] } },
+    "light.upstairs": { state: "on" },
+    "light.hall": { state: "off" },
+  };
+  card.hass = { states };
+  await card._open();
+  await tick();
+  const first = card._popupCard;
+  const renderPopup = card._renderPopup.bind(card);
+  let renders = 0;
+  card._renderPopup = () => {
+    renders++;
+    return renderPopup();
+  };
+  card.hass = { states: { ...states, "sensor.clock": { state: "1" } } };
+  assert.equal(renders, 0);
+  assert.equal(card._popupCard, first);
+
+  card.hass = { states: { ...states, "light.upstairs": { state: "off" } } };
+  assert.equal(card._popupCard, first);
+  card.hass = { states: { ...states, "light.hall": { state: "on" } } };
+  await tick();
+  assert.deepEqual(card._popupCard.config.entities, ["light.upstairs", "light.hall"]);
+  card._dialog.open = false;
+  await tick();
+  card.remove();
+});
+
 test("swipe dismissal replaces the dragged sheet and preserves native card events", async () => {
   const card = await makeCard();
   const trigger = card._triggerCard;
